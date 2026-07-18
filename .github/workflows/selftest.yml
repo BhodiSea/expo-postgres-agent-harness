@@ -47,15 +47,32 @@ jobs:
           node-version: 22
       - run: node scripts/check-syntax.mjs
       - run: node scripts/hygiene.mjs
-      # Coverage floor over the installer itself. Measured 82.9/78.5/96.4 with
-      # the W1 test set (lifecycle/graduate tests return with the populated
-      # template); floors sit under with headroom and rise back toward the
-      # source harness's bar as those tests return.
+      # Gate↔canary lockstep (mirrors the source harness's placement): every
+      # VALIDATE ∪ STOP step carries a registered red-proof, every proof file
+      # runs green with real tests (the zero-test TAP detection is
+      # format-independent — resolved paths, never rendered text — so the
+      # Windows leg judges the same signal), and every guard rule id has a
+      # behavioral canary in tests/hooks/hook-contract.test.mjs.
+      - run: node scripts/check-canary-coverage.mjs
+      # Coverage floor over the installer itself. Measured 91.6/80.2/95.2 with
+      # the W5b test set (lifecycle/graduate restored); floors sit ~6 points
+      # under, raised from the W1 78/70/90 — floors only ever rise.
       - run: >-
           node --test --experimental-test-coverage
           --test-coverage-include='installer/**'
-          --test-coverage-lines=78 --test-coverage-branches=70 --test-coverage-functions=90
+          --test-coverage-lines=85 --test-coverage-branches=74 --test-coverage-functions=91
           "tests/**/*.test.mjs"
+      # Second floor over the TEMPLATE gate-support libs (template/base/tools/lib/**),
+      # measured 94.5/89.0/84.6 at W5b over the gate-logic tests; floors sit ~6
+      # points under. The gate SCRIPTS themselves (tools/check-*.mjs) run as
+      # CHILD processes and are covered BEHAVIORALLY by the canary red-proof
+      # closure (scripts/check-canary-coverage.mjs), not by line coverage — a
+      # gate that cannot go red is decoration, which line counting cannot catch.
+      - run: >-
+          node --test --experimental-test-coverage
+          --test-coverage-include='template/base/tools/lib/**'
+          --test-coverage-lines=88 --test-coverage-branches=82 --test-coverage-functions=78
+          "tests/gates/*.test.mjs"
 
   # A rendered scaffold carries no unrendered {{PLACEHOLDER}} and no
   # cross-stack residue — proven on a real init into a scratch dir.
@@ -77,3 +94,356 @@ jobs:
         run: node scripts/check-residue.mjs "$RUNNER_TEMP/scaffold"
       - name: rendered tree passes the syntax scan
         run: node scripts/check-syntax.mjs "$RUNNER_TEMP/scaffold"
+
+  # One deliberate violation per gate DIRECTION; each must turn the matching
+  # gate red on an otherwise-green scaffold. Baseline-pass first so a failure is
+  # attributable to the injection, not to a broken fixture. Ubuntu only, no
+  # emulator, and no EAS/Apple/Google credentials — the config-resolving gates
+  # (expo-policy, native-deps, e2e, build) only need the installed expo CLI.
+  # The W6 device lanes carry their own wall-clock canaries when they land
+  # (see tests/canary/injections.json PORT NOTE).
+  canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+      - name: Scaffold canary fixture (committed git baseline for the diff-based gates)
+        run: |
+          node installer/cli.mjs init --dir "$RUNNER_TEMP/canary" --tier core --yes
+          cd "$RUNNER_TEMP/canary"
+          git init -q -b main
+          git add -A
+          git -c user.email=selftest@localhost -c user.name=selftest commit -qm 'scaffold baseline'
+      - name: Install the scaffold (config resolution + jest + export need real deps)
+        working-directory: ${{ runner.temp }}/canary
+        run: |
+          corepack enable
+          corepack prepare --activate
+          pnpm install --no-frozen-lockfile
+      - name: RLS runner FAILS CLOSED without a database (CI=true)
+        working-directory: ${{ runner.temp }}/canary
+        run: |
+          if CI=true node tests/rls/run-rls.mjs; then
+            echo '::error::CANARY: the RLS runner exited 0 with no database reachable — a skip is reading as a pass'; exit 1
+          fi
+          echo 'canary OK: rls runner fails closed without a database'
+      - name: Baseline — every canaried gate PASSES on the clean scaffold
+        working-directory: ${{ runner.temp }}/canary
+        run: |
+          # GITHUB_BASE_REF belongs to the harness checkout, not this scaffold
+          # repo — unset it so the diff-based gates diff against the scaffold's
+          # own HEAD instead of a ref that does not exist here.
+          env -u GITHUB_BASE_REF node tools/check-expo-policy.mjs
+          env -u GITHUB_BASE_REF node tools/check-native-deps.mjs
+          env -u GITHUB_BASE_REF node tools/check-migrations.mjs
+          env -u GITHUB_BASE_REF node tools/check-sources.mjs
+          env -u GITHUB_BASE_REF node tools/check-rls-manifest.mjs
+          env -u GITHUB_BASE_REF node tools/check-gate-integrity.mjs
+          env -u GITHUB_BASE_REF node tools/check-prompts-lock.mjs
+          env -u GITHUB_BASE_REF node tools/check-styleguide-manifest.mjs
+          env -u GITHUB_BASE_REF node tools/check-route-manifest.mjs
+          env -u GITHUB_BASE_REF node tools/check-mobile-perf.mjs --closure
+          env -u GITHUB_BASE_REF node tools/check-docs-sync.mjs
+          env -u GITHUB_BASE_REF node tools/check-duplication.mjs
+          env -u GITHUB_BASE_REF node tools/check-test-quality.mjs
+          env -u GITHUB_BASE_REF node tools/check-i18n.mjs
+          env -u GITHUB_BASE_REF node tools/check-e2e.mjs
+          env -u GITHUB_BASE_REF node tools/build-check.mjs
+      - name: 'Canary 1: NSAllowsArbitraryLoads + undeclared permission + secret-shaped extra → expo-policy must FAIL'
+        working-directory: ${{ runner.temp }}/canary
+        run: |
+          node -e '
+            const fs = require("node:fs")
+            const f = "apps/mobile/app.config.ts"
+            let s = fs.readFileSync(f, "utf8")
+            s = s.replace("supportsTablet: true,", "supportsTablet: true,\n      infoPlist: { NSAppTransportSecurity: { NSAllowsArbitraryLoads: true } },")
+            s = s.replace("adaptiveIcon: {", "permissions: [\"android.permission.CAMERA\"],\n      adaptiveIcon: {")
+            s = s.replace("extra: {", "extra: {\n      canaryApiKey: \"shipped-in-bundle\",")
+            fs.writeFileSync(f, s)
+          '
+          if env -u GITHUB_BASE_REF node tools/check-expo-policy.mjs > canary1.log 2>&1; then
+            cat canary1.log
+            echo '::error::CANARY: expo-policy PASSED an ATS hole + unreviewed permission + secret-shaped extra — the gate cannot fail'; exit 1
+          fi
+          grep -q 'NSAllowsArbitraryLoads' canary1.log
+          grep -q 'no reviewed reason' canary1.log
+          grep -q 'secret-shaped key' canary1.log
+          git checkout -q -- apps/mobile/app.config.ts
+          echo 'canary OK: expo-policy went red on all three legs'
+      - name: 'Canary 2: stage the generated android/ dir → native-deps must FAIL (CNG purity)'
+        working-directory: ${{ runner.temp }}/canary
+        run: |
+          mkdir -p apps/mobile/android
+          echo '// prebuild output' > apps/mobile/android/build.gradle
+          git add -f apps/mobile/android
+          if env -u GITHUB_BASE_REF node tools/check-native-deps.mjs; then
+            echo '::error::CANARY: native-deps PASSED a committed native dir — CNG purity cannot fail'; exit 1
+          fi
+          git rm -qr --cached apps/mobile/android
+          rm -rf apps/mobile/android
+          echo 'canary OK: native-deps went red'
+      - name: 'Canary 3: edit a committed migration → migrations must FAIL'
+        working-directory: ${{ runner.temp }}/canary
+        run: |
+          echo 'ALTER TABLE notes ADD COLUMN sneaky text;' >> packages/schema/drizzle/0000_init.sql
+          if env -u GITHUB_BASE_REF node tools/check-migrations.mjs; then
+            echo '::error::CANARY: migrations PASSED after editing a committed migration — the gate cannot fail'; exit 1
+          fi
+          git checkout -q -- .
+          echo 'canary OK: migrations went red'
+      - name: 'Canary 4: strip SOURCE citations from decision sites → provenance must FAIL'
+        working-directory: ${{ runner.temp }}/canary
+        run: |
+          sed -i '/SOURCE:/d' packages/schema/drizzle/0000_init.sql
+          if env -u GITHUB_BASE_REF node tools/check-sources.mjs; then
+            echo '::error::CANARY: provenance PASSED with uncited decision sites — the gate cannot fail'; exit 1
+          fi
+          git checkout -q -- .
+          echo 'canary OK: provenance went red'
+      - name: 'Canary 5: remove FORCE RLS from the migration → schema-rls must FAIL'
+        working-directory: ${{ runner.temp }}/canary
+        run: |
+          sed -i '/FORCE ROW LEVEL SECURITY/d' packages/schema/drizzle/0000_init.sql
+          if env -u GITHUB_BASE_REF node tools/check-rls-manifest.mjs; then
+            echo '::error::CANARY: schema-rls PASSED without FORCE RLS — the gate cannot fail'; exit 1
+          fi
+          git checkout -q -- .
+          echo 'canary OK: schema-rls went red'
+      - name: 'Canary 6: tamper a gate script on disk → gate-integrity must FAIL'
+        working-directory: ${{ runner.temp }}/canary
+        run: |
+          echo '// tampered by the selftest canary' >> tools/check-migrations.mjs
+          if env -u GITHUB_BASE_REF node tools/check-gate-integrity.mjs; then
+            echo '::error::CANARY: gate-integrity PASSED a tampered gate script — the manifest hash surface cannot fail'; exit 1
+          fi
+          git checkout -q -- tools/check-migrations.mjs
+          echo 'canary OK: gate-integrity went red'
+      - name: 'Canary 7: tamper a hash-locked prompt → prompts must FAIL'
+        working-directory: ${{ runner.temp }}/canary
+        run: |
+          echo ' ' >> packages/eval/prompts/extract.v1.md
+          if env -u GITHUB_BASE_REF node tools/check-prompts-lock.mjs; then
+            echo '::error::CANARY: prompts PASSED a tampered hash-locked prompt — the gate cannot fail'; exit 1
+          fi
+          git checkout -q -- .
+          echo 'canary OK: prompts went red'
+      - name: 'Canary 8: raw hex + inline-style literals in a screen → styleguide must FAIL'
+        working-directory: ${{ runner.temp }}/canary
+        run: |
+          printf 'import { View } from "react-native"\nexport const Oops = () => <View style={{ padding: 17, backgroundColor: "#ff0000" }} />\n' > apps/mobile/src/oops.tsx
+          if env -u GITHUB_BASE_REF node tools/check-styleguide-manifest.mjs > canary8.log 2>&1; then
+            cat canary8.log
+            echo '::error::CANARY: styleguide PASSED raw hex + an inline style object — the gate cannot fail'; exit 1
+          fi
+          grep -q '#ff0000' canary8.log
+          rm apps/mobile/src/oops.tsx
+          echo 'canary OK: styleguide went red on both legs'
+      - name: 'Canary 9: an orphan app/ route file + an unregistered screen → route-manifest must FAIL'
+        working-directory: ${{ runner.temp }}/canary
+        run: |
+          printf 'export default function Rogue() {\n  return null\n}\n' > apps/mobile/app/rogue.tsx
+          printf 'export default function Reports() {\n  return null\n}\n' > 'apps/mobile/app/(tabs)/reports.tsx'
+          if env -u GITHUB_BASE_REF node tools/check-route-manifest.mjs; then
+            echo '::error::CANARY: route-manifest PASSED unclaimed route files — the closure cannot fail'; exit 1
+          fi
+          rm apps/mobile/app/rogue.tsx 'apps/mobile/app/(tabs)/reports.tsx'
+          echo 'canary OK: route-manifest went red'
+      - name: 'Canary 10: a route with no Maestro flow / no startup-budget row → the mobile-perf closure must FAIL'
+        working-directory: ${{ runner.temp }}/canary
+        run: |
+          rm maestro/flows/actions.yaml
+          if env -u GITHUB_BASE_REF node tools/check-mobile-perf.mjs --closure; then
+            echo '::error::CANARY: mobile-perf --closure PASSED a route with no Maestro flow — the closure cannot fail'; exit 1
+          fi
+          git checkout -q -- maestro/flows/actions.yaml
+          node -e '
+            const fs = require("node:fs")
+            const f = "tools/startup-budget.json"
+            const j = JSON.parse(fs.readFileSync(f, "utf8"))
+            delete j.screens.actions
+            fs.writeFileSync(f, JSON.stringify(j, null, 2))
+          '
+          if env -u GITHUB_BASE_REF node tools/check-mobile-perf.mjs --closure; then
+            echo '::error::CANARY: mobile-perf --closure PASSED a route with no startup-budget row — the closure cannot fail'; exit 1
+          fi
+          git checkout -q -- tools/startup-budget.json
+          echo 'canary OK: mobile-perf closure went red on both legs'
+      - name: 'Canary 11: a zero-test jest run → the e2e gate must FAIL (anti-vacuity)'
+        working-directory: ${{ runner.temp }}/canary
+        run: |
+          cat >> apps/mobile/jest.config.js <<'EOF'
+          module.exports.testMatch = ['<rootDir>/__no_tests_here__/*.test.js']
+          module.exports.passWithNoTests = true
+          EOF
+          if env -u GITHUB_BASE_REF node tools/check-e2e.mjs > canary11.log 2>&1; then
+            cat canary11.log
+            echo '::error::CANARY: the e2e gate PASSED a jest run that ran nothing — the anti-vacuity check cannot fail'; exit 1
+          fi
+          grep -q 'vacuous' canary11.log
+          git checkout -q -- apps/mobile/jest.config.js
+          echo 'canary OK: e2e went red on a vacuous run'
+      - name: 'Canary 12: a tiny committed perf-baseline → the build gzip ratchet must FAIL'
+        working-directory: ${{ runner.temp }}/canary
+        run: |
+          node -e '
+            const fs = require("node:fs")
+            fs.writeFileSync("tools/perf-baseline.json", JSON.stringify({ gzip: { total: 1000 }, ratioCap: 1.25 }, null, 2))
+          '
+          if env -u GITHUB_BASE_REF node tools/build-check.mjs > canary12.log 2>&1; then
+            cat canary12.log
+            echo '::error::CANARY: build PASSED a bundle far over baseline × ratioCap — the ratchet cannot fail'; exit 1
+          fi
+          grep -q 'exceeds the committed ratchet' canary12.log
+          git checkout -q -- tools/perf-baseline.json
+          echo 'canary OK: the build ratchet went red'
+      - name: 'Canary 13: remove a numbered gates-catalog section → docs-sync must FAIL'
+        working-directory: ${{ runner.temp }}/canary
+        run: |
+          sed -i '/^### 21\. docs-sync/d' docs/harness/gates-catalog.md
+          if env -u GITHUB_BASE_REF node tools/check-docs-sync.mjs; then
+            echo '::error::CANARY: docs-sync PASSED with a gate missing from the catalog — the lockstep cannot fail'; exit 1
+          fi
+          git checkout -q -- docs/harness/gates-catalog.md
+          echo 'canary OK: docs-sync went red'
+      - name: 'Canary 14: a pasted token clone across two modules → duplication must FAIL'
+        working-directory: ${{ runner.temp }}/canary
+        run: |
+          clone() {
+            printf 'export function canaryCloneScore(rows: number[]): number {\n'
+            printf '  let total = 0\n'
+            printf '  let positives = 0\n'
+            printf '  let negatives = 0\n'
+            printf '  for (const row of rows) {\n'
+            printf '    if (row > 0) {\n'
+            printf '      total += row * 2\n'
+            printf '      positives += 1\n'
+            printf '    } else {\n'
+            printf '      total -= row * 3\n'
+            printf '      negatives += 1\n'
+            printf '    }\n'
+            printf '  }\n'
+            printf '  const mean = total / Math.max(rows.length, 1)\n'
+            printf '  const spread = Math.max(...rows) - Math.min(...rows)\n'
+            printf '  return mean + spread + total + positives - negatives\n'
+            printf '}\n'
+          }
+          clone > apps/mobile/src/features/notes/canaryClone.ts
+          clone > apps/mobile/src/features/matrix/canaryClone.ts
+          if env -u GITHUB_BASE_REF node tools/check-duplication.mjs; then
+            echo '::error::CANARY: duplication PASSED an identical 18-line paste across two modules — the clone scan cannot fail'; exit 1
+          fi
+          rm apps/mobile/src/features/notes/canaryClone.ts apps/mobile/src/features/matrix/canaryClone.ts
+          echo 'canary OK: duplication went red'
+      - name: 'Canary 15: a committed .only → test-quality must FAIL'
+        working-directory: ${{ runner.temp }}/canary
+        run: |
+          printf 'import { describe, it, expect } from "vitest"\n\ndescribe("canary", () => {\n  it.only("focuses the run", () => {\n    expect(1).toBe(1)\n  })\n})\n' > apps/server/src/canary-focus.test.ts
+          if env -u GITHUB_BASE_REF node tools/check-test-quality.mjs; then
+            echo '::error::CANARY: test-quality PASSED a committed .only — the focused-test check cannot fail'; exit 1
+          fi
+          rm apps/server/src/canary-focus.test.ts
+          echo 'canary OK: test-quality went red'
+      - name: 'Canary 16: a hardcoded user-facing string → the static i18n gate must FAIL'
+        working-directory: ${{ runner.temp }}/canary
+        run: |
+          printf 'import { AppText } from "../components/AppText"\n\nexport const Oops = () => <AppText>Hardcoded canary copy</AppText>\n' > apps/mobile/src/oops-i18n.tsx
+          if env -u GITHUB_BASE_REF node tools/check-i18n.mjs; then
+            echo '::error::CANARY: i18n PASSED a hardcoded user-facing string — the static scan cannot fail'; exit 1
+          fi
+          rm apps/mobile/src/oops-i18n.tsx
+          echo 'canary OK: the static i18n gate went red'
+      - name: Restore sanity — gates green again after the last restore
+        working-directory: ${{ runner.temp }}/canary
+        run: |
+          env -u GITHUB_BASE_REF node tools/check-rls-manifest.mjs
+          env -u GITHUB_BASE_REF node tools/check-route-manifest.mjs
+          env -u GITHUB_BASE_REF node tools/check-i18n.mjs
+
+  canary-mutation:
+    name: 'canary-mutation: an untested branch must red the mutation lane — and nothing else'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+      - name: Bootstrap a fresh project
+        run: node installer/cli.mjs init --dir "$GITHUB_WORKSPACE/.selftest/mut" --tier core --yes
+      - name: Install
+        working-directory: .selftest/mut
+        run: |
+          corepack enable
+          corepack prepare --activate
+          pnpm install --no-frozen-lockfile
+
+      # Baseline: the shipped exemplar must be green before we can claim an injection reds it.
+      - name: 'Baseline: the shipped critical surface is within its committed baseline'
+        working-directory: .selftest/mut
+        run: |
+          pnpm exec stryker run stryker.config.mjs
+          node tools/check-mutation-ratchet.mjs
+
+      - name: 'Canary: add ONE untested branch to a well-covered file → the mutation lane must FAIL while every other gate stays GREEN'
+        working-directory: .selftest/mut
+        run: |
+          # Git baseline so the diff-scoped gates below (diff-coverage, test-quality) judge
+          # EXACTLY the one file this canary injects — not every untracked scaffold file.
+          git init -q -b main
+          git add -A
+          git -c user.email=selftest@localhost -c user.name=selftest commit -qm 'scaffold baseline'
+          python3 - <<'PY'
+          p = 'apps/server/src/auth/verify.ts'
+          s = open(p).read()
+          s = s.replace(
+              "function buildVerifier(getKey: JwksKeyGetter, issuer: string, audience: string): TokenVerifier {",
+              "function buildVerifier(getKey: JwksKeyGetter, issuer: string, audience: string, env: Env = {}): TokenVerifier {", 1)
+          s = s.replace(
+              "    const { payload } = await jwtVerify(token, getKey, {",
+              "    const skew = env['AUTH_CLOCK_SKEW']\n    const tolerance = skew === undefined ? 300 : Number(skew)\n    const { payload } = await jwtVerify(token, getKey, {", 1)
+          s = s.replace("      clockTolerance: 300,", "      clockTolerance: tolerance,", 1)
+          open(p, 'w').write(s)
+          PY
+          grep -q 'AUTH_CLOCK_SKEW' apps/server/src/auth/verify.ts \
+            || { echo '::error::the canary injection did not apply — the source moved; fix the patch, do not delete the canary'; exit 1; }
+
+          # (1) Every OTHER control must stay green — otherwise this proves nothing about
+          #     what mutation testing uniquely adds over them. Both coverage maps are
+          #     written first: diff-coverage merges the vitest and jest-expo maps.
+          pnpm exec vitest run --coverage --silent \
+            || { echo '::error::MUTATION CANARY: the unit suite reddened. The injection must be executed-but-unverified, not broken'; exit 1; }
+          pnpm --filter mobile exec jest --coverage --silent \
+            || { echo '::error::MUTATION CANARY: the mobile unit suite reddened; the injection touches only the server'; exit 1; }
+          # env -u GITHUB_BASE_REF: the diff-scoped gates read GITHUB_BASE_REF, which belongs
+          # to the harness checkout, not this scaffold's git repo.
+          env -u GITHUB_BASE_REF node tools/check-diff-coverage.mjs \
+            || { echo '::error::MUTATION CANARY: diff-coverage reddened; the injection was supposed to slip THROUGH the per-file floors'; exit 1; }
+          env -u GITHUB_BASE_REF node tools/check-test-quality.mjs \
+            || { echo '::error::MUTATION CANARY: test-quality reddened; the injection adds no test, it does not remove an assertion'; exit 1; }
+
+          # (2) …and the mutation lane must catch what all of them missed.
+          rm -rf reports/mutation .stryker-tmp
+          pnpm exec stryker run stryker.config.mjs --mutate apps/server/src/auth/verify.ts
+          if node tools/check-mutation-ratchet.mjs > ratchet.log 2>&1; then
+            cat ratchet.log
+            echo '::error::MUTATION CANARY: an untested branch survived the ratchet. The lane cannot fail, so it is decoration — coverage already told us this code RAN; only mutation can tell us no test would NOTICE it breaking'
+            exit 1
+          fi
+          grep -q 'new surviving mutant' ratchet.log \
+            || { cat ratchet.log; echo '::error::the ratchet failed for the WRONG reason (not a new survivor)'; exit 1; }
+          grep -E 'AUTH_CLOCK_SKEW|new surviving mutant|change:' ratchet.log | head -n 8
+          git checkout -q -- apps/server/src/auth/verify.ts
+          echo 'canary OK: unit + diff-coverage + test-quality all stayed GREEN; only the mutation ratchet caught it'

@@ -2,74 +2,14 @@
   "//": "Surviving mutants this project has ACCEPTED. Every entry needs a reason \u2014 a survivor is a place your tests would not notice the code breaking, so accepting one is a deliberate, reviewed act (the gate FAILS on an empty reason). Regenerate with `node tools/check-mutation-ratchet.mjs --write`; identity is position-independent, so line shifts never invalidate an entry. This file is write-guard-protected and hashed by gate-integrity.",
   "survivors": [
     {
-      "id": "03a406cc2d9b",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "ConditionalExpression",
-      "original": "text !== ''",
-      "replacement": "true",
-      "snippet": "} else if (text !== '') {",
-      "status": "Survived",
-      "reason": "SSE parser edge the current property corpus does not distinguish (chunk-boundary CR, BOM flag, comment lines, id-digit anchors, empty-string state resets): the spec-visible behaviour is asserted at the event level and these mutants alter only states no corpus case reaches. Accepted eyes-open \u2014 each is a named W5b hardening candidate (a targeted case kills it and ratchets it out via --write)."
-    },
-    {
       "id": "0ae52ed79260",
       "file": "apps/mobile/src/lib/sse.ts",
       "mutator": "StringLiteral",
       "original": "''",
       "replacement": "\"Stryker was here!\"",
-      "snippet": "state: { ...state, dataLines: [], eventType: '' },",
+      "snippet": "let machine: SseParserState = { ...state, bomStripped, buffer: '' }",
       "status": "Survived",
-      "reason": "SSE parser edge the current property corpus does not distinguish (chunk-boundary CR, BOM flag, comment lines, id-digit anchors, empty-string state resets): the spec-visible behaviour is asserted at the event level and these mutants alter only states no corpus case reaches. Accepted eyes-open \u2014 each is a named W5b hardening candidate (a targeted case kills it and ratchets it out via --write)."
-    },
-    {
-      "id": "1b3f0f2a127f",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "StringLiteral",
-      "original": "'\\r'",
-      "replacement": "\"\"",
-      "snippet": "if (!state.buffer.endsWith('\\r')) return { state, events: [] }",
-      "status": "Survived",
-      "reason": "SSE parser edge the current property corpus does not distinguish (chunk-boundary CR, BOM flag, comment lines, id-digit anchors, empty-string state resets): the spec-visible behaviour is asserted at the event level and these mutants alter only states no corpus case reaches. Accepted eyes-open \u2014 each is a named W5b hardening candidate (a targeted case kills it and ratchets it out via --write)."
-    },
-    {
-      "id": "1e23f343e1f2",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "StringLiteral",
-      "original": "'SSE response carried no body stream'",
-      "replacement": "\"\"",
-      "snippet": "if (body === null) throw new Error('SSE response carried no body stream')",
-      "status": "NoCoverage",
-      "reason": "the reader-pump half of streamSse (reader.read loop, releaseLock, expo/fetch dynamic import, accept header): needs a real streaming fetch, which the vitest lane deliberately never opens \u2014 the PURE parser (feedSse) is the property-tested surface, and the jest-expo suite + the live-API proof drive the pump. Killing these needs a mock-ReadableStream harness: recorded as the W5b test-hardening candidate, accepted eyes-open until then."
-    },
-    {
-      "id": "27f7c6305517",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "BooleanLiteral",
-      "original": "true",
-      "replacement": "false",
-      "snippet": "const fed = feedSse(state, decoder.decode(value, { stream: true }))",
-      "status": "NoCoverage",
-      "reason": "the reader-pump half of streamSse (reader.read loop, releaseLock, expo/fetch dynamic import, accept header): needs a real streaming fetch, which the vitest lane deliberately never opens \u2014 the PURE parser (feedSse) is the property-tested surface, and the jest-expo suite + the live-API proof drive the pump. Killing these needs a mock-ReadableStream harness: recorded as the W5b test-hardening candidate, accepted eyes-open until then."
-    },
-    {
-      "id": "2f735d07834e",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "ConditionalExpression",
-      "original": "done",
-      "replacement": "false",
-      "snippet": "if (done) break",
-      "status": "NoCoverage",
-      "reason": "the reader-pump half of streamSse (reader.read loop, releaseLock, expo/fetch dynamic import, accept header): needs a real streaming fetch, which the vitest lane deliberately never opens \u2014 the PURE parser (feedSse) is the property-tested surface, and the jest-expo suite + the live-API proof drive the pump. Killing these needs a mock-ReadableStream harness: recorded as the W5b test-hardening candidate, accepted eyes-open until then."
-    },
-    {
-      "id": "35df6f4d7c6c",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "ConditionalExpression",
-      "original": "body === null",
-      "replacement": "true",
-      "snippet": "if (body === null) throw new Error('SSE response carried no body stream')",
-      "status": "NoCoverage",
-      "reason": "the reader-pump half of streamSse (reader.read loop, releaseLock, expo/fetch dynamic import, accept header): needs a real streaming fetch, which the vitest lane deliberately never opens \u2014 the PURE parser (feedSse) is the property-tested surface, and the jest-expo suite + the live-API proof drive the pump. Killing these needs a mock-ReadableStream harness: recorded as the W5b test-hardening candidate, accepted eyes-open until then."
+      "reason": "GENUINELY EQUIVALENT (W5b review): the surviving instance of this id is the machine-INIT `buffer: ''` \u2014 machine.buffer is dead state inside the loop and is unconditionally overwritten by `text.slice(start)` at the return, so no value planted there is observable. The dispatch-reset instance that shares this position-independent id (same file/mutator/original/replacement) WAS killed by the parser-edge kill corpus ('dispatch resets the event type to the DEFAULT')."
     },
     {
       "id": "3cd63897a8cd",
@@ -79,187 +19,7 @@
       "replacement": "i <= text.length",
       "snippet": "for (let i = start; i < text.length; i += 1) {",
       "status": "Survived",
-      "reason": "SSE parser edge the current property corpus does not distinguish (chunk-boundary CR, BOM flag, comment lines, id-digit anchors, empty-string state resets): the spec-visible behaviour is asserted at the event level and these mutants alter only states no corpus case reaches. Accepted eyes-open \u2014 each is a named W5b hardening candidate (a targeted case kills it and ratchets it out via --write)."
-    },
-    {
-      "id": "48aef1723f2c",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "BlockStatement",
-      "original": "{ for (;;) { const { done, value } = await reader.read() if (done) break const fed = feedSse(state, decoder.decode(value",
-      "replacement": "{}",
-      "snippet": "try {",
-      "status": "NoCoverage",
-      "reason": "the reader-pump half of streamSse (reader.read loop, releaseLock, expo/fetch dynamic import, accept header): needs a real streaming fetch, which the vitest lane deliberately never opens \u2014 the PURE parser (feedSse) is the property-tested surface, and the jest-expo suite + the live-API proof drive the pump. Killing these needs a mock-ReadableStream harness: recorded as the W5b test-hardening candidate, accepted eyes-open until then."
-    },
-    {
-      "id": "58ecfd8f945e",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "EqualityOperator",
-      "original": "body === null",
-      "replacement": "body !== null",
-      "snippet": "if (body === null) throw new Error('SSE response carried no body stream')",
-      "status": "NoCoverage",
-      "reason": "the reader-pump half of streamSse (reader.read loop, releaseLock, expo/fetch dynamic import, accept header): needs a real streaming fetch, which the vitest lane deliberately never opens \u2014 the PURE parser (feedSse) is the property-tested surface, and the jest-expo suite + the live-API proof drive the pump. Killing these needs a mock-ReadableStream harness: recorded as the W5b test-hardening candidate, accepted eyes-open until then."
-    },
-    {
-      "id": "5dcb13ea87a0",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "BlockStatement",
-      "original": "{ reader.releaseLock() }",
-      "replacement": "{}",
-      "snippet": "} finally {",
-      "status": "NoCoverage",
-      "reason": "the reader-pump half of streamSse (reader.read loop, releaseLock, expo/fetch dynamic import, accept header): needs a real streaming fetch, which the vitest lane deliberately never opens \u2014 the PURE parser (feedSse) is the property-tested surface, and the jest-expo suite + the live-API proof drive the pump. Killing these needs a mock-ReadableStream harness: recorded as the W5b test-hardening candidate, accepted eyes-open until then."
-    },
-    {
-      "id": "68ee5a40b9ea",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "ObjectLiteral",
-      "original": "{ fetchImpl, signal: options.signal ?? null, headers: { accept: 'text/event-stream' }, }",
-      "replacement": "{}",
-      "snippet": "const response = await apiFetch(path, {",
-      "status": "NoCoverage",
-      "reason": "the reader-pump half of streamSse (reader.read loop, releaseLock, expo/fetch dynamic import, accept header): needs a real streaming fetch, which the vitest lane deliberately never opens \u2014 the PURE parser (feedSse) is the property-tested surface, and the jest-expo suite + the live-API proof drive the pump. Killing these needs a mock-ReadableStream harness: recorded as the W5b test-hardening candidate, accepted eyes-open until then."
-    },
-    {
-      "id": "719f289d978f",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "BooleanLiteral",
-      "original": "true",
-      "replacement": "false",
-      "snippet": "bomStripped = true",
-      "status": "Survived",
-      "reason": "SSE parser edge the current property corpus does not distinguish (chunk-boundary CR, BOM flag, comment lines, id-digit anchors, empty-string state resets): the spec-visible behaviour is asserted at the event level and these mutants alter only states no corpus case reaches. Accepted eyes-open \u2014 each is a named W5b hardening candidate (a targeted case kills it and ratchets it out via --write)."
-    },
-    {
-      "id": "7527524b88ea",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "StringLiteral",
-      "original": "''",
-      "replacement": "\"Stryker was here!\"",
-      "snippet": "} else if (text !== '') {",
-      "status": "Survived",
-      "reason": "SSE parser edge the current property corpus does not distinguish (chunk-boundary CR, BOM flag, comment lines, id-digit anchors, empty-string state resets): the spec-visible behaviour is asserted at the event level and these mutants alter only states no corpus case reaches. Accepted eyes-open \u2014 each is a named W5b hardening candidate (a targeted case kills it and ratchets it out via --write)."
-    },
-    {
-      "id": "78c37084ad16",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "ObjectLiteral",
-      "original": "{ stream: true }",
-      "replacement": "{}",
-      "snippet": "const fed = feedSse(state, decoder.decode(value, { stream: true }))",
-      "status": "NoCoverage",
-      "reason": "the reader-pump half of streamSse (reader.read loop, releaseLock, expo/fetch dynamic import, accept header): needs a real streaming fetch, which the vitest lane deliberately never opens \u2014 the PURE parser (feedSse) is the property-tested surface, and the jest-expo suite + the live-API proof drive the pump. Killing these needs a mock-ReadableStream harness: recorded as the W5b test-hardening candidate, accepted eyes-open until then."
-    },
-    {
-      "id": "7bc4e2f303ee",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "MethodExpression",
-      "original": "state.buffer.endsWith('\\r')",
-      "replacement": "state.buffer.startsWith('\\r')",
-      "snippet": "if (!state.buffer.endsWith('\\r')) return { state, events: [] }",
-      "status": "Survived",
-      "reason": "SSE parser edge the current property corpus does not distinguish (chunk-boundary CR, BOM flag, comment lines, id-digit anchors, empty-string state resets): the spec-visible behaviour is asserted at the event level and these mutants alter only states no corpus case reaches. Accepted eyes-open \u2014 each is a named W5b hardening candidate (a targeted case kills it and ratchets it out via --write)."
-    },
-    {
-      "id": "815d7518c589",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "LogicalOperator",
-      "original": "options.fetchImpl ?? (await expoStreamingFetch())",
-      "replacement": "options.fetchImpl && (await expoStreamingFetch())",
-      "snippet": "const fetchImpl = options.fetchImpl ?? (await expoStreamingFetch())",
-      "status": "NoCoverage",
-      "reason": "the reader-pump half of streamSse (reader.read loop, releaseLock, expo/fetch dynamic import, accept header): needs a real streaming fetch, which the vitest lane deliberately never opens \u2014 the PURE parser (feedSse) is the property-tested surface, and the jest-expo suite + the live-API proof drive the pump. Killing these needs a mock-ReadableStream harness: recorded as the W5b test-hardening candidate, accepted eyes-open until then."
-    },
-    {
-      "id": "86994e815c09",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "Regex",
-      "original": "/^\\d+$/",
-      "replacement": "/^\\d+/",
-      "snippet": "if (!/^\\d+$/.test(value)) return { state, event: null }",
-      "status": "Survived",
-      "reason": "SSE parser edge the current property corpus does not distinguish (chunk-boundary CR, BOM flag, comment lines, id-digit anchors, empty-string state resets): the spec-visible behaviour is asserted at the event level and these mutants alter only states no corpus case reaches. Accepted eyes-open \u2014 each is a named W5b hardening candidate (a targeted case kills it and ratchets it out via --write)."
-    },
-    {
-      "id": "8dfc7ff1c24d",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "Regex",
-      "original": "/^\\d+$/",
-      "replacement": "/\\d+$/",
-      "snippet": "if (!/^\\d+$/.test(value)) return { state, event: null }",
-      "status": "Survived",
-      "reason": "SSE parser edge the current property corpus does not distinguish (chunk-boundary CR, BOM flag, comment lines, id-digit anchors, empty-string state resets): the spec-visible behaviour is asserted at the event level and these mutants alter only states no corpus case reaches. Accepted eyes-open \u2014 each is a named W5b hardening candidate (a targeted case kills it and ratchets it out via --write)."
-    },
-    {
-      "id": "960353fcf0b5",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "BlockStatement",
-      "original": "{ const fetchImpl = options.fetchImpl ?? (await expoStreamingFetch()) const response = await apiFetch(path, { fetchImpl,",
-      "replacement": "{}",
-      "snippet": "): Promise<void> {",
-      "status": "NoCoverage",
-      "reason": "the reader-pump half of streamSse (reader.read loop, releaseLock, expo/fetch dynamic import, accept header): needs a real streaming fetch, which the vitest lane deliberately never opens \u2014 the PURE parser (feedSse) is the property-tested surface, and the jest-expo suite + the live-API proof drive the pump. Killing these needs a mock-ReadableStream harness: recorded as the W5b test-hardening candidate, accepted eyes-open until then."
-    },
-    {
-      "id": "979802aa4cc7",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "StringLiteral",
-      "original": "''",
-      "replacement": "\"Stryker was here!\"",
-      "snippet": "let machine: SseParserState = { ...state, bomStripped, buffer: '' }",
-      "status": "Survived",
-      "reason": "SSE parser edge the current property corpus does not distinguish (chunk-boundary CR, BOM flag, comment lines, id-digit anchors, empty-string state resets): the spec-visible behaviour is asserted at the event level and these mutants alter only states no corpus case reaches. Accepted eyes-open \u2014 each is a named W5b hardening candidate (a targeted case kills it and ratchets it out via --write)."
-    },
-    {
-      "id": "b52d04109802",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "LogicalOperator",
-      "original": "options.signal ?? null",
-      "replacement": "options.signal && null",
-      "snippet": "signal: options.signal ?? null,",
-      "status": "NoCoverage",
-      "reason": "the reader-pump half of streamSse (reader.read loop, releaseLock, expo/fetch dynamic import, accept header): needs a real streaming fetch, which the vitest lane deliberately never opens \u2014 the PURE parser (feedSse) is the property-tested surface, and the jest-expo suite + the live-API proof drive the pump. Killing these needs a mock-ReadableStream harness: recorded as the W5b test-hardening candidate, accepted eyes-open until then."
-    },
-    {
-      "id": "bdd0f734be61",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "ConditionalExpression",
-      "original": "done",
-      "replacement": "true",
-      "snippet": "if (done) break",
-      "status": "NoCoverage",
-      "reason": "the reader-pump half of streamSse (reader.read loop, releaseLock, expo/fetch dynamic import, accept header): needs a real streaming fetch, which the vitest lane deliberately never opens \u2014 the PURE parser (feedSse) is the property-tested surface, and the jest-expo suite + the live-API proof drive the pump. Killing these needs a mock-ReadableStream harness: recorded as the W5b test-hardening candidate, accepted eyes-open until then."
-    },
-    {
-      "id": "c39726f030c2",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "StringLiteral",
-      "original": "' '",
-      "replacement": "\"\"",
-      "snippet": "const value = rawValue.startsWith(' ') ? rawValue.slice(1) : rawValue",
-      "status": "Survived",
-      "reason": "SSE parser edge the current property corpus does not distinguish (chunk-boundary CR, BOM flag, comment lines, id-digit anchors, empty-string state resets): the spec-visible behaviour is asserted at the event level and these mutants alter only states no corpus case reaches. Accepted eyes-open \u2014 each is a named W5b hardening candidate (a targeted case kills it and ratchets it out via --write)."
-    },
-    {
-      "id": "d9d0db3514c4",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "ObjectLiteral",
-      "original": "{ accept: 'text/event-stream' }",
-      "replacement": "{}",
-      "snippet": "headers: { accept: 'text/event-stream' },",
-      "status": "NoCoverage",
-      "reason": "the reader-pump half of streamSse (reader.read loop, releaseLock, expo/fetch dynamic import, accept header): needs a real streaming fetch, which the vitest lane deliberately never opens \u2014 the PURE parser (feedSse) is the property-tested surface, and the jest-expo suite + the live-API proof drive the pump. Killing these needs a mock-ReadableStream harness: recorded as the W5b test-hardening candidate, accepted eyes-open until then."
-    },
-    {
-      "id": "de2bbb6b97ae",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "BlockStatement",
-      "original": "{ const { done, value } = await reader.read() if (done) break const fed = feedSse(state, decoder.decode(value, { stream:",
-      "replacement": "{}",
-      "snippet": "for (;;) {",
-      "status": "NoCoverage",
-      "reason": "the reader-pump half of streamSse (reader.read loop, releaseLock, expo/fetch dynamic import, accept header): needs a real streaming fetch, which the vitest lane deliberately never opens \u2014 the PURE parser (feedSse) is the property-tested surface, and the jest-expo suite + the live-API proof drive the pump. Killing these needs a mock-ReadableStream harness: recorded as the W5b test-hardening candidate, accepted eyes-open until then."
+      "reason": "GENUINELY EQUIVALENT (W5b review): at i === text.length, charAt returns '' which matches neither terminator, so the extra iteration is a no-op \u2014 `<=` and `<` walk identical states. No input can distinguish them."
     },
     {
       "id": "de7acc8ee6dc",
@@ -269,17 +29,7 @@
       "replacement": "state.buffer",
       "snippet": "return feedSse({ ...state, buffer: state.buffer.slice(0, -1) }, '\\n')",
       "status": "Survived",
-      "reason": "SSE parser edge the current property corpus does not distinguish (chunk-boundary CR, BOM flag, comment lines, id-digit anchors, empty-string state resets): the spec-visible behaviour is asserted at the event level and these mutants alter only states no corpus case reaches. Accepted eyes-open \u2014 each is a named W5b hardening candidate (a targeted case kills it and ratchets it out via --write)."
-    },
-    {
-      "id": "e12c7d0a22d0",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "ConditionalExpression",
-      "original": "for (;;) { const { done, value } = await reader.read() if (done) break const fed = feedSse(state, decoder.decode(value, ",
-      "replacement": "for (; false;) { const { done, value } = await reader.read(); if (done) break; const fed = feedSse(state, decoder.decode",
-      "snippet": "for (;;) {",
-      "status": "NoCoverage",
-      "reason": "the reader-pump half of streamSse (reader.read loop, releaseLock, expo/fetch dynamic import, accept header): needs a real streaming fetch, which the vitest lane deliberately never opens \u2014 the PURE parser (feedSse) is the property-tested surface, and the jest-expo suite + the live-API proof drive the pump. Killing these needs a mock-ReadableStream harness: recorded as the W5b test-hardening candidate, accepted eyes-open until then."
+      "reason": "GENUINELY EQUIVALENT (W5b review): keeping the deferred CR and appending LF turns the flushed tail into a CRLF-terminated line, and the walk counts CRLF as ONE terminator \u2014 byte-for-byte the same lines, events and final buffer as slicing the CR off first. The neighbouring flush mutants (endsWith weakenings, slice(0,+1)) are killed by the buffered-tail kill corpus; this one is the spec's own CRLF\u2261LF equivalence."
     },
     {
       "id": "e66ef899bddc",
@@ -289,27 +39,7 @@
       "replacement": "false",
       "snippet": "if (line.startsWith(':')) return { state, event: null }",
       "status": "Survived",
-      "reason": "SSE parser edge the current property corpus does not distinguish (chunk-boundary CR, BOM flag, comment lines, id-digit anchors, empty-string state resets): the spec-visible behaviour is asserted at the event level and these mutants alter only states no corpus case reaches. Accepted eyes-open \u2014 each is a named W5b hardening candidate (a targeted case kills it and ratchets it out via --write)."
-    },
-    {
-      "id": "e86375babbe9",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "StringLiteral",
-      "original": "'text/event-stream'",
-      "replacement": "\"\"",
-      "snippet": "headers: { accept: 'text/event-stream' },",
-      "status": "NoCoverage",
-      "reason": "the reader-pump half of streamSse (reader.read loop, releaseLock, expo/fetch dynamic import, accept header): needs a real streaming fetch, which the vitest lane deliberately never opens \u2014 the PURE parser (feedSse) is the property-tested surface, and the jest-expo suite + the live-API proof drive the pump. Killing these needs a mock-ReadableStream harness: recorded as the W5b test-hardening candidate, accepted eyes-open until then."
-    },
-    {
-      "id": "f254ad0a8fdb",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "UnaryOperator",
-      "original": "-1",
-      "replacement": "+1",
-      "snippet": "return feedSse({ ...state, buffer: state.buffer.slice(0, -1) }, '\\n')",
-      "status": "Survived",
-      "reason": "SSE parser edge the current property corpus does not distinguish (chunk-boundary CR, BOM flag, comment lines, id-digit anchors, empty-string state resets): the spec-visible behaviour is asserted at the event level and these mutants alter only states no corpus case reaches. Accepted eyes-open \u2014 each is a named W5b hardening candidate (a targeted case kills it and ratchets it out via --write)."
+      "reason": "GENUINELY EQUIVALENT (W5b review): without the comment fast path, ':comment' parses as field '' (colon at 0) and falls into the default ignore arm \u2014 same state, no event, for every comment form. The fast path mirrors the spec's step order; removing it changes nothing observable."
     },
     {
       "id": "f3915abe5be3",
@@ -319,27 +49,7 @@
       "replacement": "{}",
       "snippet": "async function expoStreamingFetch(): Promise<FetchImplementation> {",
       "status": "NoCoverage",
-      "reason": "the reader-pump half of streamSse (reader.read loop, releaseLock, expo/fetch dynamic import, accept header): needs a real streaming fetch, which the vitest lane deliberately never opens \u2014 the PURE parser (feedSse) is the property-tested surface, and the jest-expo suite + the live-API proof drive the pump. Killing these needs a mock-ReadableStream harness: recorded as the W5b test-hardening candidate, accepted eyes-open until then."
-    },
-    {
-      "id": "f66f037668ff",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "ConditionalExpression",
-      "original": "!state.buffer.endsWith('\\r')",
-      "replacement": "false",
-      "snippet": "if (!state.buffer.endsWith('\\r')) return { state, events: [] }",
-      "status": "Survived",
-      "reason": "SSE parser edge the current property corpus does not distinguish (chunk-boundary CR, BOM flag, comment lines, id-digit anchors, empty-string state resets): the spec-visible behaviour is asserted at the event level and these mutants alter only states no corpus case reaches. Accepted eyes-open \u2014 each is a named W5b hardening candidate (a targeted case kills it and ratchets it out via --write)."
-    },
-    {
-      "id": "fe48aab45edc",
-      "file": "apps/mobile/src/lib/sse.ts",
-      "mutator": "ConditionalExpression",
-      "original": "body === null",
-      "replacement": "false",
-      "snippet": "if (body === null) throw new Error('SSE response carried no body stream')",
-      "status": "NoCoverage",
-      "reason": "the reader-pump half of streamSse (reader.read loop, releaseLock, expo/fetch dynamic import, accept header): needs a real streaming fetch, which the vitest lane deliberately never opens \u2014 the PURE parser (feedSse) is the property-tested surface, and the jest-expo suite + the live-API proof drive the pump. Killing these needs a mock-ReadableStream harness: recorded as the W5b test-hardening candidate, accepted eyes-open until then."
+      "reason": "the expo/fetch default-transport resolver: only reachable when streamApiSse is called WITHOUT an injected fetchImpl, i.e. on a real device. The vitest pump corpus (W5b) drives every other pump mutant through the injected transport, but evaluating the real `import('expo/fetch')` under node is not meaningful \u2014 the jest lane and the on-device flows own this arm. Accepted eyes-open."
     },
     {
       "id": "4ed85cad43ce",

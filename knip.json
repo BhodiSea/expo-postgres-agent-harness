@@ -27,5 +27,5 @@
     "template/base/**/*.ts"
   ],
   "ignoreDependencies": ["@modelcontextprotocol/sdk", "@stryker-mutator/api"],
-  "ignoreBinaries": ["biome"]
+  "ignoreBinaries": ["biome", "vitest", "stryker"]
 }

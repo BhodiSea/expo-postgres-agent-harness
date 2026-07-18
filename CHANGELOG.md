@@ -51,3 +51,25 @@ beyond what the repo's own checks verify.
   (`parseJsonc` 24), and `template/base/tools/check-expo-policy.mjs`
   (`checkEasJson` 16), each carrying the matching inline disable whose
   ceiling the ratchet enforces.
+- The test wave (W5b): `tests/gates/` (fixture-driven can-fail proofs
+  spawning every real gate, including the new mobile gates), `tests/hooks/`
+  (the hook I/O fail-closed contract plus a behavioral deny/allow canary for
+  every one of the 72 guard-rule ids, closure asserted bidirectionally),
+  and the restored installer lifecycle/graduate suites. The canary registry
+  `tests/canary/injections.json` covers every VALIDATE ∪ STOP step (30 in
+  total) and every shipped quality-gate CI lane, with W6 PORT NOTEs for the
+  device-lane wall-clock canaries that cannot exist before the emulator
+  lanes; `scripts/check-canary-coverage.mjs` enforces gate↔canary lockstep
+  (stale or missing proofs red, every proof file executed and structurally
+  non-empty) and runs in the selftest matrix on both OSes. The selftest
+  workflow gains the `canary` job (a real installed scaffold: 16 injections,
+  each inject → gate red → revert → green, plus the RLS runner's no-database
+  fail-closed proof) and the `canary-mutation` job (an untested branch in a
+  fully-mutation-covered file leaves vitest, jest, diff-coverage and
+  test-quality green while only the mutation ratchet reds). Installer
+  coverage floors raised to 85/74/91 (measured 91.6/80.2/95.2) with a second
+  floor over `template/base/tools/lib/**` at 88/82/78. The SSE suite gains a
+  parser-edge kill corpus and a mock-ReadableStream pump corpus, cutting the
+  committed mutation baseline from 54 accepted survivors to 25 (663 mutants,
+  638 killed; every remaining survivor carries a reviewed
+  genuinely-equivalent or lane-ownership reason).
