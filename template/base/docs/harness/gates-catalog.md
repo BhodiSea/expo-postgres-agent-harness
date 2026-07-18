@@ -24,10 +24,13 @@ here deliberately rather than papered over:
   expo-router navigation, api-client and i18n run for real, but Hermes bytecode load,
   native module init, Fabric layout, and the OS keychain do not. The on-device half is
   the Maestro emulator lane plus the startup-budget measurement, and those are CI-ONLY
-  (the device lane arms in the CI workstream; `mobile-perf --closure` in the Stop chain
-  is the static half that guarantees every screen HAS a flow and a budget row the day
-  it registers). A turn can end green having never booted the app on a device. That is
-  a deliberate trade (seconds-fast, laptop-complete agent loop), not an oversight.
+  (quality-gate `mobile-e2e` + `perf-lane`, path-filtered + nightly; `mobile-perf
+  --closure` in the Stop chain is the static half that guarantees every screen HAS a
+  flow and a budget row the day it registers). A turn can end green having never booted
+  the app on a device. That is a deliberate trade (seconds-fast, laptop-complete agent
+  loop), not an oversight — and the selftest maestro-smoke job proves the trade is
+  real coverage, not decoration: a broken container testID leaves the jest lane green
+  (asserted) while the device sweep reds.
 - **The a11y floor is weaker than a browser-driven axe sweep.** The desktop original
   swept every route with axe-core in a real browser engine per theme. There is no axe
   for React Native: this harness's floor is eslint-plugin-react-native-a11y (every rule
@@ -457,12 +460,26 @@ flow and budget row; leave a stale row for a deleted route → FAIL.
 
 ## CI-only lanes (outside the chain and the Stop hook)
 
-- **Maestro device lane** — credential-free: `expo prebuild -p android` →
-  gradle assemble → install the APK on a GH-hosted emulator → `maestro test
-  maestro/flows/` (a BUILT BINARY, never a dev-client shortcut), plus the
-  startup measurement that feeds `check-mobile-perf` (see above). iOS simulator
-  variant runs nightly on macOS. Arming in the CI workstream; the flows and
-  budgets are already gate-closed so screens cannot outrun the lane.
+- **Maestro device lane** (`mobile-e2e`) — credential-free: `expo prebuild -p
+  android` → gradle assemble → install on a GH-hosted emulator → the per-route
+  flows plus the GENERATED route sweep (`tools/check-e2e-device.mjs`, flows
+  derived from `src/routes.ts` by `tools/lib/maestro-flows.mjs` — a new route is
+  swept with zero YAML edits), re-run under a flipped OS theme and font_scale
+  1.3. Two installs, honestly split: the RELEASE binary (minified Hermes — where
+  Fabric view flattening actually bites) runs the sweeps signed-out; the DEV
+  binary (Metro on the runner) runs what release cannot — the kv-pre-seeded
+  ar-XB/RTL boot (`maestro/journeys/i18n-rtl.yaml`), the mutation flow
+  (stub sign-in → create note → relaunch → persists, against the real server +
+  Postgres), and the perf-harness journey (the dev screen self-measures against
+  `tools/interaction-budget.json` and the flow asserts its `perf-pass` leaf).
+  Path-filtered + nightly (emulator cost); anti-vacuity: a phase that executed
+  zero flows exits red, and evidence (Maestro debug output, screenshot, logcat
+  tail) uploads on every failure.
+- **Startup measurement lane** (`perf-lane`) — `tools/measure-startup.mjs` cold-
+  starts every ROUTES entry on its own quiet emulator (`am force-stop` +
+  `am start -W` per deep link), writes `artifacts/perf-results.json`, and
+  `HARNESS_PERF_LANE=1 node tools/check-mobile-perf.mjs` enforces
+  `tools/startup-budget.json` — failing CLOSED if the artifact is missing.
 - **mutation** — `pnpm mutation` (StrykerJS over the critical surface —
   authorization and transport boundary code), a SET-based ratchet against
   `tools/mutation-baseline.json`: a NEW surviving mutant reds; accepting one is a
@@ -475,7 +492,9 @@ flow and budget row; leave a stale row for a deleted route → FAIL.
   under FORCE RLS. Every other lane mocks the network — which is exactly how the
   desktop original once shipped requests with no Authorization header at all
   while every gate stayed green. Its negative control (an unauthenticated call
-  must fail) keeps it falsifiable.
+  must fail) keeps it falsifiable, and the harness selftest proves the lane
+  end-to-end (Canary C01: strip the api-client's one bearer-attaching line →
+  the suite reds, restore → green).
 
 ## Opt-in modules
 

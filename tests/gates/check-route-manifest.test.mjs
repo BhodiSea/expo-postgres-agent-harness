@@ -33,7 +33,8 @@ const SHIPPED_CATALOG = readFileSync(
 )
 
 // The scaffold's app/ tree, plumbing included: _layout/+html/api are pattern-excluded
-// from enumeration, sign-in/+not-found are the allowlisted chrome.
+// from enumeration, sign-in/+not-found/perf-harness are the allowlisted chrome
+// (perf-harness is the W6 dev measurement screen the device lane deep-links).
 const SCAFFOLD_APP_FILES = [
   '(tabs)/_layout.tsx',
   '(tabs)/index.tsx',
@@ -43,6 +44,7 @@ const SCAFFOLD_APP_FILES = [
   '+not-found.tsx',
   'actions.tsx',
   'api/health+api.ts',
+  'perf-harness.tsx',
   'sign-in.tsx',
 ]
 

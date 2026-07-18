@@ -57,9 +57,10 @@ beyond what the repo's own checks verify.
   every one of the 72 guard-rule ids, closure asserted bidirectionally),
   and the restored installer lifecycle/graduate suites. The canary registry
   `tests/canary/injections.json` covers every VALIDATE ∪ STOP step (30 in
-  total) and every shipped quality-gate CI lane, with W6 PORT NOTEs for the
-  device-lane wall-clock canaries that cannot exist before the emulator
-  lanes; `scripts/check-canary-coverage.mjs` enforces gate↔canary lockstep
+  total) and every shipped quality-gate CI lane, initially with W6 PORT NOTEs
+  for the device-lane wall-clock canaries that could not exist before the
+  emulator lanes (the W6 entry below arms them all and retires the notes);
+  `scripts/check-canary-coverage.mjs` enforces gate↔canary lockstep
   (stale or missing proofs red, every proof file executed and structurally
   non-empty) and runs in the selftest matrix on both OSes. The selftest
   workflow gains the `canary` job (a real installed scaffold: 16 injections,
@@ -73,3 +74,36 @@ beyond what the repo's own checks verify.
   committed mutation baseline from 54 accepted survivors to 25 (663 mutants,
   638 killed; every remaining survivor carries a reviewed
   genuinely-equivalent or lane-ownership reason).
+- The device, perf, and integration lanes (W6). The consumer quality-gate's
+  two W6 stubs become real jobs, path-filtered + nightly like the native
+  lane: `mobile-e2e` (checksum-pinned Maestro cli-2.6.1 on a KVM api-33
+  aosp_atd emulator; the release binary runs every committed per-route flow
+  plus a GENERATED route sweep — derived from `src/routes.ts` by the
+  unit-tested `tools/lib/maestro-flows.mjs`, never hand-copied — re-run under
+  a flipped OS theme and font_scale 1.3; the Metro-served dev binary runs the
+  kv-pre-seeded ar-XB/RTL journey, the sign-in → create-note → relaunch
+  mutation flow against a real server + Postgres, and the perf-harness
+  journey) and `perf-lane` (`tools/measure-startup.mjs` cold-starts every
+  route via `am start -W` deep links and writes the artifact
+  `check-mobile-perf`'s measurement mode enforces, fail-closed). New consumer
+  surfaces: `tools/check-e2e-device.mjs` (per-flow timeout, failure evidence
+  — Maestro debug output + screenshot + logcat tail — and anti-vacuity: zero
+  executed flows is a red), `tools/gen-maestro-flows.mjs` (sweep/perf-harness
+  generation + `--flow` scaffolding for the mobile-perf closure), the
+  hand-authored `maestro/journeys/` (i18n-rtl, mutation), and the dev-only
+  `app/perf-harness.tsx` chrome screen that self-measures against
+  `tools/interaction-budget.json` and exposes the `perf-pass`/`perf-fail`
+  leaf markers Maestro asserts. Selftest grows `bootstrap-linux` (fresh
+  scaffold validate-green out of the box on node 22/24, warm wall-time
+  budget with the e2e-stamp positive control, live RLS green), `integration`
+  (the LIVE_PROOF suite against a real scaffold + server + Postgres), and
+  the schedule/dispatch-only `maestro-smoke` (the emulator lane end-to-end
+  on a real scaffold). Every W6 PORT-NOTEd canary is armed as a real
+  red-proof: Canary 17 (keyset-index drop → the DAL plan probe reds),
+  Canary 18 (a Date.now() config plugin → the prebuild ×2 tree compare
+  reds), Canary C01 (strip the api-client's one bearer-attaching line → the
+  live suite reds, then green after revert), Canary 19 (a broken container
+  testID → the device sweep reds while the agent-time jest lane is asserted
+  GREEN), and Canary 20 (a 300ms stall on the ranking path → the perf-pass
+  marker flips). The `HARNESS_W6_DEVICE_LANES` arming variable is gone —
+  the lanes are unconditional on their triggers, mirroring the native job.

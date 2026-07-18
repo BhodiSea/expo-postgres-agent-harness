@@ -114,6 +114,16 @@ export const en = {
   'signin.entra.body': 'Sign in with your organization’s Microsoft Entra account.',
   'signin.entra.submit': 'Sign in with Microsoft',
 
+  // ---- perf harness (dev chrome — app/perf-harness.tsx) ------------------------
+  'perf.title': 'Performance harness',
+  'perf.running': 'Measuring interaction latency…',
+  'perf.pass': 'All interaction budgets pass',
+  'perf.fail': 'Interaction budget exceeded',
+  // {metric} is a machine id (tabSwitchMs / actionsOpenMs / droppedFrames) — a
+  // diagnostic key, deliberately untranslated; the numbers localize via t().
+  'perf.over': '{metric}: measured {measured}, budget {cap}',
+  'perf.unavailable': 'The performance harness is a development-build surface.',
+
   // ---- not found --------------------------------------------------------------
   'notFound.title': 'Screen not found',
   'notFound.body': 'That link does not match any screen in this app.',

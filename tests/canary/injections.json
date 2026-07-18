@@ -1,5 +1,5 @@
 {
-  "comment": "Falsifiability registry: every step in VALIDATE_STEPS ∪ STOP_HOOK_STEPS must carry at least one mechanical proof that it CAN go red. Proof kinds: 'fixture' (a repo test file that spawns the real gate and asserts exit 1 — ref must exist), 'selftest' (a literal step-name string that must appear in .github/workflows/selftest.yml), 'runner' (the step wraps a vendor tool whose non-zero exit is the red; OUR wiring's failure propagation is proven by the validate-runner tests — ref must exist). scripts/check-canary-coverage.mjs enforces bidirectional closure: an unregistered step OR a stale registry entry reds the PR that caused it. Guard-rule falsifiability is a PER-RULE closure, not a count: check-canary-coverage.mjs imports the pure-data rule tables from .claude/hooks/lib/guard-rules.mjs (BASH_RULES, WRITE_PROTECTED, WRITE_GLOBAL_CHECKS) and asserts every rule id has a behavioral deny/allow case (a RULE_CANARIES entry) in tests/hooks/hook-contract.test.mjs — a rule added without a canary reds the PR. hookRules below keeps only a human-readable grep-able deny example per surface. PORT NOTE (W6): the DEVICE-lane wall-clock canaries — the 300ms busy-loop that must red the startup-budget measurement and the broken-testID that must red the Maestro flow lane — cannot be registered yet: they need the W6 emulator lanes, this schema has no deferred-proof kind, and inventing one would let a lane ship 'proven' by a job that does not exist. They arm in W6 together with the bootstrap/device selftest jobs; until then the mobile-e2e / perf-lane MEASUREMENT halves are recorded as honest losses in their lane notes below and in docs/harness/gates-catalog.md.",
+  "comment": "Falsifiability registry: every step in VALIDATE_STEPS ∪ STOP_HOOK_STEPS must carry at least one mechanical proof that it CAN go red. Proof kinds: 'fixture' (a repo test file that spawns the real gate and asserts exit 1 — ref must exist), 'selftest' (a literal step-name string that must appear in .github/workflows/selftest.yml), 'runner' (the step wraps a vendor tool whose non-zero exit is the red; OUR wiring's failure propagation is proven by the validate-runner tests — ref must exist). scripts/check-canary-coverage.mjs enforces bidirectional closure: an unregistered step OR a stale registry entry reds the PR that caused it. Guard-rule falsifiability is a PER-RULE closure, not a count: check-canary-coverage.mjs imports the pure-data rule tables from .claude/hooks/lib/guard-rules.mjs (BASH_RULES, WRITE_PROTECTED, WRITE_GLOBAL_CHECKS) and asserts every rule id has a behavioral deny/allow case (a RULE_CANARIES entry) in tests/hooks/hook-contract.test.mjs — a rule added without a canary reds the PR. hookRules below keeps only a human-readable grep-able deny example per surface. W6 ARMED the deferred device/runtime canaries in real selftest jobs: the broken-testID sweep red + agent-chain green (maestro-smoke Canary 19), the 300ms busy-loop perf-marker red (maestro-smoke Canary 20), the keyset-index-drop plan-probe red (bootstrap-linux Canary 17), the strip-Authorization live-suite red (integration Canary C01), and the nondeterministic-plugin prebuild-compare red (bootstrap-linux Canary 18). What remains CI-cadence-honest rather than per-PR: the emulator canaries live in a schedule/dispatch-only job (cost), stated in the lane notes below.",
   "steps": {
     "format": [
       {
@@ -198,7 +198,12 @@
       {
         "kind": "selftest",
         "ref": "RLS runner FAILS CLOSED without a database (CI=true)",
-        "note": "PORT NOTE (W6): the source harness's Canary 9 (drop the keyset index → the DAL plan probe reds on a Sort over the owner partition) needs a live Postgres + installed scaffold, which is the W6 bootstrap lane; it arms there. Until then the fail-closed proof above and the template's own tests/rls suite are the registered coverage — recorded honestly rather than pointing at a job that does not exist."
+        "note": "the no-database direction: a missing Postgres must red, never skip-green"
+      },
+      {
+        "kind": "selftest",
+        "ref": "Canary 17: drop the keyset index → the DAL plan probe must FAIL (a whole-partition Sort at scale)",
+        "note": "the live direction (bootstrap-linux, real scaffold + the pinned pgvector database): the suite runs green, then the keyset index is dropped and the DAL plan probe must red naming its query shape — proof the probe EXPLAINs the DAL's real SQL, not a statement nobody runs"
       }
     ],
     "unit": [
@@ -324,8 +329,9 @@
     ],
     "integration-lane": [
       {
-        "kind": "steps",
-        "note": "PORT NOTE (W6): the mobile<->server seam smoke (LIVE_PROOF live-api suite against a real server + Postgres). Its red-proof — strip the Authorization header from the api client and the create->list->paginate smoke must 401 — needs the installed-scaffold + database selftest lane and arms in W6 with it; the jest runner's own failure propagation is proven under 'e2e'/'mobile-unit' above. Recorded honestly rather than pointing at a selftest job that does not exist yet."
+        "kind": "selftest",
+        "ref": "Canary C01: strip the Authorization header from the api-client one door → the live suite must FAIL",
+        "note": "the selftest `integration` job runs the SAME LIVE_PROOF suite this lane runs, against a real scaffold + server + Postgres: green baseline, then the one bearer-attaching line is stripped and the suite must red with an auth-shaped failure, then green again after the revert — the exact no-Authorization defect class the desktop-era source harness shipped while every mocked lane stayed green"
       }
     ],
     "changes": [
@@ -337,20 +343,36 @@
     "native": [
       {
         "kind": "steps",
-        "note": "prebuild-x2 determinism: runs `expo prebuild` twice from a clean tree and diffs — the assertion is a byte compare whose non-zero exit is the red, plus expo-doctor and gates proven in #steps. PORT NOTE (W6): an end-to-end injection (a config plugin emitting nondeterministic output must red the compare) arms with the W6 device/bootstrap lanes."
+        "note": "prebuild-x2 determinism: runs `expo prebuild` twice from a clean tree and diffs — the assertion is a byte compare whose non-zero exit is the red, plus expo-doctor and gates proven in #steps."
+      },
+      {
+        "kind": "selftest",
+        "ref": "Canary 18: a config plugin emitting run-dependent output → the prebuild ×2 tree compare must FAIL",
+        "note": "end-to-end on a real scaffold (bootstrap-linux): the clean double-prebuild is byte-stable (positive control), then a Date.now()-stamping config plugin is injected and the SAME tree-hash compare the native lane runs must see the mismatch"
       }
     ],
     "mobile-e2e": [
       {
-        "kind": "steps",
-        "note": "PORT NOTE (W6): the Maestro device lane (emulator + built APK), vars-gated OFF (HARNESS_W6_DEVICE_LANES) until W6 arms it. Its red-proof — a broken testID must fail the flow — needs the emulator lane itself; registered as an honest loss here and in docs/harness/gates-catalog.md rather than claimed via a job that does not run."
+        "kind": "fixture",
+        "ref": "tests/gates/check-e2e-device.test.mjs",
+        "note": "the runner's own failure surface, spawned for real against stub maestro/adb: a failing flow propagates with evidence artifacts, a ROUTES id with no flow reds, per-flow timeout kills, anti-vacuity, and the skip-local/fail-closed-CI asymmetry"
+      },
+      {
+        "kind": "selftest",
+        "ref": "Canary 19: a broken route-surface testID → the device sweep must FAIL while the agent-time jest lane stays GREEN",
+        "note": "the honest-loss proof on a REAL emulator (maestro-smoke, schedule/dispatch — emulator cost keeps it off the per-PR path): breaking the home container testID leaves tools/check-e2e.mjs green (asserted — the fast lane's blindness is real) while the device sweep reds naming the surface. Both halves checked, so the lane provably adds coverage the chain does not have"
       }
     ],
     "perf-lane": [
       {
         "kind": "fixture",
         "ref": "tests/gates/check-mobile-perf.test.mjs",
-        "note": "the budget arithmetic + closure inverses + measurement-mode fail-closed behavior. PORT NOTE (W6): the wall-clock canary (a 300ms busy-loop on a route's boot path must red the startup-budget measurement) needs the emulator lane and arms in W6 — the measurement half is an honest loss until then."
+        "note": "the budget arithmetic + closure inverses + measurement-mode fail-closed behavior; tests/gates/measure-startup.test.mjs pins the measurement half's parsers and its artifact contract (an unparseable launch reds, absence of reportFullyDrawn records honestly)"
+      },
+      {
+        "kind": "selftest",
+        "ref": "Canary 20: a 300ms busy-loop on the actions ranking path → the perf-harness marker must go RED",
+        "note": "the wall-clock canary on a REAL emulator (maestro-smoke, schedule/dispatch): a 300ms stall injected into rankCommands must flip the dev perf-harness screen's self-measured marker to perf-fail and red the journey, then green again after the revert — the interaction floor has been SEEN failing, so it is not decoration"
       }
     ]
   }
