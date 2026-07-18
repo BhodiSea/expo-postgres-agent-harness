@@ -15,6 +15,7 @@ import {
   buildPerfHarnessYaml,
   buildRouteFlowYaml,
   buildSweepYaml,
+  perfHarnessUrl,
 } from '../../template/base/tools/lib/maestro-flows.mjs'
 import {
   deepLink,
@@ -126,19 +127,23 @@ test('buildRouteFlowYaml scaffolds a closure-satisfying per-route flow', () => {
   assert.ok(yaml.includes('id: "reports-screen"'), yaml)
 })
 
-test('buildPerfHarnessYaml carries every budget cap into the deep link and asserts the marker', () => {
-  const yaml = buildPerfHarnessYaml(IDENTITY, {
-    tabSwitchMs: 400,
-    actionsOpenMs: 600,
-    frameDropMax: 12,
-    runs: 7,
-  })
-  assert.ok(
-    yaml.includes('canaryapp://perf-harness?tabSwitchMs=400&actionsOpenMs=600&frameDropMax=12&runs=7'),
-    yaml,
-  )
+test('perf-harness journey asserts the markers and carries NO openLink — the runner delivers the link', () => {
+  const budgets = { tabSwitchMs: 400, actionsOpenMs: 600, frameDropMax: 12, runs: 7 }
+  const yaml = buildPerfHarnessYaml(IDENTITY, budgets)
+  // The query-string link must NEVER ride Maestro's openLink: the device shell
+  // splits it at the first '&' and the intent silently never fires (proven live
+  // on the emulator lane). The journey is assert-only.
+  assert.ok(!/^- openLink:/m.test(yaml), yaml)
   assert.ok(yaml.includes('id: "perf-pass"'), yaml)
   assert.ok(yaml.includes('id: "perf-harness-screen"'), yaml)
+})
+
+test('perfHarnessUrl carries every budget cap as a query param on the app scheme', () => {
+  const url = perfHarnessUrl(IDENTITY, { tabSwitchMs: 400, actionsOpenMs: 600, frameDropMax: 12, runs: 7 })
+  assert.equal(
+    url,
+    'canaryapp://perf-harness?tabSwitchMs=400&actionsOpenMs=600&frameDropMax=12&runs=7',
+  )
 })
 
 // ---------------------------------------------------------------------------

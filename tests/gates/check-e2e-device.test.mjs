@@ -186,16 +186,23 @@ test('--phase journey runs exactly the named file; a missing file reds', () => {
   assert.ok(red.out.includes('--phase journey needs --file'), red.out)
 })
 
-test('--phase perf-harness: journey generated FROM the budget file, caps in the deep link', () => {
+test('--phase perf-harness: assert-only journey; the FULL query-string link is delivered via adb am start', () => {
   const dir = fixture()
   const r = run(dir, ['--phase', 'perf-harness'])
   assert.equal(r.code, 0, r.out)
   const journey = readFileSync(join(dir, 'artifacts/maestro/perf-harness.yaml'), 'utf8')
-  assert.ok(
-    journey.includes('stubapp://perf-harness?tabSwitchMs=400&actionsOpenMs=600&frameDropMax=12&runs=7'),
-    journey,
-  )
+  // openLink would hand the URL to the device shell unquoted and lose everything
+  // after the first '&' (proven live on the emulator lane) — the journey must be
+  // assert-only, with the runner delivering the link itself.
+  assert.ok(!/^- openLink:/m.test(journey), journey)
   assert.ok(journey.includes('id: "perf-pass"'), journey)
+  const invocations = readFileSync(join(dir, 'fakebin', 'invocations.log'), 'utf8')
+  assert.ok(
+    invocations.includes(
+      "am start -W -a android.intent.action.VIEW -d 'stubapp://perf-harness?tabSwitchMs=400&actionsOpenMs=600&frameDropMax=12&runs=7'",
+    ),
+    invocations,
+  )
 })
 
 test('RED --phase perf-harness: a malformed budget file fails closed, never relaxes', () => {

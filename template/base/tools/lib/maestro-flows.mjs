@@ -86,20 +86,20 @@ export function buildRouteFlowYaml(route, { appId, scheme }) {
  * @param {{ tabSwitchMs: number, actionsOpenMs: number, frameDropMax: number, runs: number }} budgets
  * @returns {string}
  */
-export function buildPerfHarnessYaml({ appId, scheme }, budgets) {
-  const params = [
-    `tabSwitchMs=${String(budgets.tabSwitchMs)}`,
-    `actionsOpenMs=${String(budgets.actionsOpenMs)}`,
-    `frameDropMax=${String(budgets.frameDropMax)}`,
-    `runs=${String(budgets.runs)}`,
-  ].join('&')
+export function buildPerfHarnessYaml({ appId }, budgets) {
+  void budgets // budgets travel in the URL (perfHarnessUrl); the YAML only asserts
   return [
     '# GENERATED perf-harness journey — do not edit, do not commit',
     '# (tools/lib/maestro-flows.mjs derives it from tools/interaction-budget.json).',
+    '# NO openLink here: this is the one deep link that carries a QUERY STRING, and',
+    "# Maestro's openLink passes the URL through the device shell unquoted — it splits",
+    "# at the first '&' and the intent never fires (proven live: the link reported",
+    '# COMPLETED while the hierarchy showed Home, zero navigation). The RUNNER',
+    '# (check-e2e-device --phase perf-harness) delivers the link via `adb shell am',
+    "# start` with device-shell single quotes BEFORE this journey runs; plain-path",
+    '# links elsewhere stay on openLink, which handles them fine.',
     `appId: ${q(appId)}`,
     '---',
-    '- launchApp',
-    `- openLink: ${q(`${deepLink(scheme, '/perf-harness')}?${params}`)}`,
     '- extendedWaitUntil:',
     '    visible:',
     '        id: "perf-harness-screen"',
@@ -112,6 +112,23 @@ export function buildPerfHarnessYaml({ appId, scheme }, budgets) {
     '    timeout: 120000',
     '',
   ].join('\n')
+}
+
+/**
+ * The perf-harness deep link, budgets as query params. Delivered by the RUNNER
+ * via `adb shell am start` (never Maestro openLink — see buildPerfHarnessYaml).
+ * @param {{ scheme: string }} identity
+ * @param {{ tabSwitchMs: number, actionsOpenMs: number, frameDropMax: number, runs: number }} budgets
+ * @returns {string}
+ */
+export function perfHarnessUrl({ scheme }, budgets) {
+  const params = [
+    `tabSwitchMs=${String(budgets.tabSwitchMs)}`,
+    `actionsOpenMs=${String(budgets.actionsOpenMs)}`,
+    `frameDropMax=${String(budgets.frameDropMax)}`,
+    `runs=${String(budgets.runs)}`,
+  ].join('&')
+  return `${deepLink(scheme, '/perf-harness')}?${params}`
 }
 
 /**

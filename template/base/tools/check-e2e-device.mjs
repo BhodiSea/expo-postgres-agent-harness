@@ -43,6 +43,7 @@ import {
   budgetsFromInteractionFile,
   buildPerfHarnessYaml,
   buildSweepYaml,
+  perfHarnessUrl,
 } from './lib/maestro-flows.mjs'
 import { parseRoutes, readAppIdentity } from './lib/mobile-app-meta.mjs'
 
@@ -191,6 +192,18 @@ if (phase === 'flows') {
   }
   const journeyFile = join(outDir, 'perf-harness.yaml')
   writeFileSync(journeyFile, buildPerfHarnessYaml(identity, budgets))
+  // The runner delivers the deep link itself: this is the one link with a query
+  // string, and Maestro's openLink passes the URL through the device shell
+  // unquoted — it splits at the first '&' and the intent never fires (proven
+  // live: openLink reported COMPLETED while the hierarchy showed Home). The
+  // inner single quotes survive `adb shell` onto the device shell, so the full
+  // data string reaches `am start`; the app launches cold (initial-URL path) or
+  // navigates warm (onNewIntent) — both land on /perf-harness.
+  const url = perfHarnessUrl(identity, budgets)
+  const nav = sh(`adb shell "am start -W -a android.intent.action.VIEW -d '${url}'"`)
+  if (nav.status !== 0) {
+    fail(GATE, `deep-link delivery failed (adb am start exit ${String(nav.status)}): ${String(nav.stderr ?? '').slice(0, 400)}`)
+  }
   runFlow(maestroBin, journeyFile)
   executed = 1
 } else {
