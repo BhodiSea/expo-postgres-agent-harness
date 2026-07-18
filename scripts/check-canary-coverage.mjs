@@ -74,7 +74,15 @@ for (const name of Object.keys(registry.steps ?? {})) {
 // --no-spawn keeps the fast static path for callers that only want the lockstep check (the
 // gate-integrity hash surface, the docs-sync lockstep) and for the test suite itself.
 const SPAWN = !process.argv.includes('--no-spawn')
-const selftest = readFileSync(join(ROOT, '.github/workflows/selftest.yml'), 'utf8')
+// The searched selftest corpus FOLLOWS THE INVOCATION: the workflow plus every
+// scripts/ci/* helper it invokes. The W6 emulator legs live in bash files
+// (the emulator-runner action execs its `script:` under dash, so the canary
+// legs moved to `bash scripts/ci/*.sh`) and carry their registry-greppable
+// titles there — a leg deleted from a helper must red exactly like a deleted
+// workflow step. A referenced-but-missing helper throws (fail loud).
+const selftestWorkflow = readFileSync(join(ROOT, '.github/workflows/selftest.yml'), 'utf8')
+const ciHelpers = [...new Set([...selftestWorkflow.matchAll(/scripts\/ci\/[A-Za-z0-9._-]+/g)].map((m) => m[0]))]
+const selftest = [selftestWorkflow, ...ciHelpers.map((p) => readFileSync(join(ROOT, p), 'utf8'))].join('\n')
 const CHILD_ENV = Object.fromEntries(
   Object.entries(process.env).filter(([k]) => !k.startsWith('NODE_TEST')),
 )
@@ -139,7 +147,7 @@ for (const [name, proofs] of Object.entries(registry.steps ?? {})) {
       // node_modules, a real expo config resolution, a Windows runner). It
       // cannot be spawned from here; the workflow is the execution.
       if (!selftest.includes(proof.ref)) {
-        errs.push(`step '${name}': selftest proof step "${proof.ref}" not found in .github/workflows/selftest.yml`)
+        errs.push(`step '${name}': selftest proof step "${proof.ref}" not found in .github/workflows/selftest.yml (or a scripts/ci/* helper it invokes)`)
       }
     } else {
       errs.push(`step '${name}': unknown proof kind ${JSON.stringify(proof.kind)}`)
@@ -184,7 +192,7 @@ for (const [id, proofs] of Object.entries(lanes)) {
       }
     } else if (proof.kind === 'selftest') {
       if (!selftest.includes(proof.ref)) {
-        errs.push(`lane '${id}': selftest proof step "${proof.ref}" not found in .github/workflows/selftest.yml`)
+        errs.push(`lane '${id}': selftest proof step "${proof.ref}" not found in .github/workflows/selftest.yml (or a scripts/ci/* helper it invokes)`)
       }
     } else {
       errs.push(`lane '${id}': unknown proof kind ${JSON.stringify(proof.kind)}`)

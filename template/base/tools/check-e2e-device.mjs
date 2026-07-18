@@ -88,13 +88,21 @@ function resolveMaestro() {
   return '' // unreachable: skipOrFail exits
 }
 
-/** Best-effort failure evidence: screenshot + logcat tail into the artifact dir. */
+/** Best-effort failure evidence: screenshot + logcat tail + view hierarchy into the artifact dir. */
 function captureEvidence(name) {
   try {
     sh(`adb exec-out screencap -p > ${quoted(join(outDir, `${name}-failure.png`))}`)
     const log = sh('adb logcat -d -t 400')
     if (log.status === 0) {
       writeFileSync(join(outDir, `${name}-logcat.txt`), log.stdout ?? '')
+    }
+    // The accessibility tree answers "was the element absent, empty-bounds, or
+    // mis-labeled" — the one question a black screenshot cannot (learned from
+    // the first mutation-journey red, where the screenshot was black but the
+    // tree showed the tab bar mounted).
+    const tree = sh('maestro hierarchy')
+    if (tree.status === 0) {
+      writeFileSync(join(outDir, `${name}-hierarchy.txt`), tree.stdout ?? '')
     }
   } catch {
     // Evidence is best-effort; the red below is the verdict either way.

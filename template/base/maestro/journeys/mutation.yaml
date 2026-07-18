@@ -16,6 +16,16 @@ appId: {{APP_IDENTIFIER}}
 ---
 - launchApp:
     clearState: true
+# The app must be INTERACTIVE before the deep link fires: after clearState the
+# dev build re-fetches its bundle from Metro, and a VIEW intent delivered while
+# the router is still mounting is dropped on the floor — the first emulator
+# dispatch proved it (tabs mounted signed-out, sign-in never appeared, 60s
+# timeout). open-actions is the home header leaf that exists in every data
+# state, signed-out included — it appearing IS "the router is live".
+- extendedWaitUntil:
+    visible:
+        id: "open-actions"
+    timeout: 90000
 - openLink: "{{APP_SCHEME}}://sign-in"
 - extendedWaitUntil:
     visible:
