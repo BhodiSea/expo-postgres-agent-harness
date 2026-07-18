@@ -28,6 +28,9 @@ module.exports = {
   // genuinely-hung tests failing while giving slow-runner flows headroom;
   // RNTL waitFor's own 1s timeout still bounds each individual assertion.
   testTimeout: 30000,
+  // RNTL's findBy/waitFor bound gets the same CI-runner headroom treatment —
+  // see jest.setup.ts for the evidence.
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   // pnpm keeps the real packages under node_modules/.pnpm/<pkg>@<v>/node_modules/,
   // so the must-be-transformed lookahead needs `.pnpm` in the set — without it
   // every RN/Expo module is served untranspiled and the suite dies on ESM/JSX

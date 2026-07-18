@@ -96,7 +96,7 @@ export function buildPerfHarnessYaml({ appId }, budgets) {
     "# at the first '&' and the intent never fires (proven live: the link reported",
     '# COMPLETED while the hierarchy showed Home, zero navigation). The RUNNER',
     '# (check-e2e-device --phase perf-harness) delivers the link via `adb shell am',
-    "# start` with device-shell single quotes BEFORE this journey runs; plain-path",
+    '# start` with device-shell single quotes BEFORE this journey runs; plain-path',
     '# links elsewhere stay on openLink, which handles them fine.',
     `appId: ${q(appId)}`,
     '---',

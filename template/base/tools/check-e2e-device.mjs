@@ -202,7 +202,10 @@ if (phase === 'flows') {
   const url = perfHarnessUrl(identity, budgets)
   const nav = sh(`adb shell "am start -W -a android.intent.action.VIEW -d '${url}'"`)
   if (nav.status !== 0) {
-    fail(GATE, `deep-link delivery failed (adb am start exit ${String(nav.status)}): ${String(nav.stderr ?? '').slice(0, 400)}`)
+    fail(
+      GATE,
+      `deep-link delivery failed (adb am start exit ${String(nav.status)}): ${String(nav.stderr ?? '').slice(0, 400)}`,
+    )
   }
   runFlow(maestroBin, journeyFile)
   executed = 1

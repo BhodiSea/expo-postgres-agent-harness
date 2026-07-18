@@ -13,6 +13,13 @@ apps/mobile/ios/
 # jest / maestro artifacts (fast-lane reports and device-lane recordings)
 test-results/
 .maestro/tests/
+# mutation lane (stryker sandbox + report) and device-lane evidence
+# (check-e2e-device / measure-startup write artifacts/). All generated; left
+# unignored they also enter the format gate via biome's useIgnoreFile and red
+# `pnpm validate` after any local `pnpm mutation` or device-lane run.
+.stryker-tmp/
+reports/
+artifacts/
 
 # env & local secrets — .env.example is the committed contract
 .env

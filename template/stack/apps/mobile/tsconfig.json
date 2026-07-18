@@ -27,6 +27,6 @@
   },
   // package.json is listed because app.config.ts imports it (resolveJsonModule)
   // and a composite project must name every input file.
-  "include": ["app", "src", "__tests__", "app.config.ts", "package.json"],
+  "include": ["app", "src", "__tests__", "app.config.ts", "jest.setup.ts", "package.json"],
   "references": [{ "path": "../../packages/contracts" }]
 }
