@@ -37,16 +37,29 @@ export const en = {
 
   // ---- common -----------------------------------------------------------------
   'common.reload': 'Try again',
+  'common.retry': 'Retry',
+  'common.loading': 'Loading…',
+  'common.dismiss': 'Dismiss notification',
 
-  // ---- home -------------------------------------------------------------------
-  'home.title': 'Ready to build',
-  'home.body':
-    'This shell wires the stack end to end: the API one-door client, a keychain-backed session, the locale and theme stores, and a typed route manifest. Replace this card with your first screen.',
-  'home.empty.title': 'No notes yet',
-  'home.empty.description': 'The first note you create will appear here.',
+  // ---- notes (the home screen's data panel) -------------------------------------
+  'notes.heading': 'Notes',
+  'notes.error.title': 'Could not load notes.',
+  'notes.empty.title': 'No notes yet',
+  'notes.empty.description': 'The first note you create will appear here.',
+  'notes.composer.label': 'Add a note',
+  'notes.composer.placeholder': 'Note title',
+  'notes.composer.submit': 'Add note',
+  'notes.composer.pending': 'Adding…',
+  'notes.composer.invalid': 'Enter a title between 1 and {max} characters.',
+  'notes.createdAt': 'Created {when}',
+  // The accessible name of an optimistic row: ONE key, not the title glued to a
+  // status fragment — a locale is free to reorder the two halves.
+  'notes.row.pending': '{title} — not yet saved',
 
   // ---- matrix -----------------------------------------------------------------
   'matrix.heading': 'Matrix',
+  'matrix.list': 'Notes matrix',
+  'matrix.error.title': 'Could not load the matrix.',
   'matrix.empty.title': 'No rows to chart yet',
   'matrix.empty.description':
     'Once notes exist, their numeric columns appear here as a dense, virtualized matrix.',
@@ -55,10 +68,37 @@ export const en = {
     one: '{rows} row × {columns} columns, virtualized.',
     other: '{rows} rows × {columns} columns, virtualized.',
   },
+  'matrix.pagination.hint': 'Scrolling to the end loads more rows.',
+  'matrix.loadMore': 'Load more',
+  'matrix.loadingMore': 'Loading…',
+  'matrix.loadMore.failed': 'Loading more failed.',
+  // `{message}` is the server's envelope text — a support detail we interpolate,
+  // never copy we author. The sentence around it is the catalog's.
+  'matrix.loadMore.toast': 'Could not load more rows: {message}',
+  'matrix.column.note': 'Note',
+  'matrix.column.confidence': 'Confidence',
+  'matrix.column.title': 'Title length',
+  'matrix.column.body': 'Body length',
+  'matrix.column.words': 'Words',
+  'matrix.column.lines': 'Lines',
+  'matrix.column.day': 'Day',
+  'matrix.row': 'Row {n}',
 
   // ---- actions ----------------------------------------------------------------
-  'actions.empty.title': 'No actions yet',
-  'actions.empty.description': 'Actions contributed by the active screen will appear here.',
+  'actions.search': 'Search actions',
+  'actions.placeholder': 'Type an action…',
+  'actions.noMatch.title': 'No matching action',
+  'actions.noMatch.description': 'Try a different search term.',
+  // Section headers, keyed by the machine group id (`actions.group.<id>`) — the
+  // registry's group union carries IDS, never copy (see features/actions/registry.ts).
+  'actions.group.recents': 'Recents',
+  'actions.group.navigation': 'Navigation',
+  'actions.group.notes': 'Notes',
+  'actions.group.session': 'Session',
+  'command.goHome': 'Go to Home',
+  'command.goMatrix': 'Go to Matrix',
+  'command.createNote': 'Create a note',
+  'command.signOut': 'Sign out',
 
   // ---- sign-in (dev) ----------------------------------------------------------
   'signin.title': 'Sign in',
@@ -69,6 +109,10 @@ export const en = {
   'signin.subject.invalid': 'Must be a uuid (8-4-4-4-12 hex) or blank.',
   'signin.submit': 'Sign in (dev)',
   'signin.pending': 'Signing in…',
+  // Entra mode (rendered when EXPO_PUBLIC_ENTRA_* IDs are present — see
+  // src/auth/providers/entra.ts).
+  'signin.entra.body': 'Sign in with your organization’s Microsoft Entra account.',
+  'signin.entra.submit': 'Sign in with Microsoft',
 
   // ---- not found --------------------------------------------------------------
   'notFound.title': 'Screen not found',
@@ -76,7 +120,9 @@ export const en = {
   'notFound.home': 'Go home',
 
   // ---- connection -------------------------------------------------------------
+  'connection.connecting': 'Connecting to API…',
   'connection.connected': 'API connected (v{version})',
+  'connection.unreachable': 'API unreachable — retrying',
 
   // ---- errors -----------------------------------------------------------------
   'error.title': 'Something went wrong',
@@ -92,6 +138,9 @@ export const en = {
   'error.api.internal': 'Something went wrong on the server.',
   'error.api.unknown': 'The request failed ({status}).',
   'error.api.offline': 'Could not reach the server.',
+  // The requestId suffix quoted next to a failure — what turns "it failed" into
+  // a ticket an engineer can trace. A key so the word "Reference" translates too.
+  'error.reference': 'Reference {id}',
 } as const satisfies Record<string, Message>
 
 export type MessageKey = keyof typeof en

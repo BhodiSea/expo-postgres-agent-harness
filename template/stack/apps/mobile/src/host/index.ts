@@ -9,6 +9,10 @@
 import * as SecureStore from 'expo-secure-store'
 
 const TOKEN_KEY = 'access_token'
+// The Entra refresh token — a LONG-LIVED credential, which is precisely why it
+// may only ever exist behind this seam: JS-visible storage would hand it to
+// anything running in the JS sandbox for the lifetime of the grant.
+const REFRESH_TOKEN_KEY = 'refresh_token'
 
 /**
  * The stored bearer token, or null when signed out. Corrupt-safe (the kv.ts
@@ -36,6 +40,32 @@ export async function secureSetToken(token: string): Promise<void> {
 export async function secureDeleteToken(): Promise<void> {
   try {
     await SecureStore.deleteItemAsync(TOKEN_KEY)
+  } catch {
+    // Indistinguishable from deleted on the next read.
+  }
+}
+
+/** The stored refresh token, or null. Same corrupt-safe contract as the access token. */
+export async function secureGetRefreshToken(): Promise<string | null> {
+  try {
+    return await SecureStore.getItemAsync(REFRESH_TOKEN_KEY)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Store the refresh token. NOT try/caught, same reasoning as secureSetToken: a
+ * sign-in that cannot persist its grant must fail the sign-in loudly.
+ */
+export async function secureSetRefreshToken(token: string): Promise<void> {
+  await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, token)
+}
+
+/** Drop the stored refresh token; an unreachable store already counts as deleted. */
+export async function secureDeleteRefreshToken(): Promise<void> {
+  try {
+    await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY)
   } catch {
     // Indistinguishable from deleted on the next read.
   }

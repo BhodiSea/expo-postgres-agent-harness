@@ -87,10 +87,14 @@ export default defineConfig({
             // code (this Node runner has no RN transform pipeline); everything
             // touching react-native runs under jest-expo. LOCKSTEP:
             // apps/mobile/jest.config.js testPathIgnorePatterns names exactly
-            // these three paths so no suite ever runs under both runners.
+            // these paths so no suite ever runs under both runners.
             'apps/mobile/src/i18n/i18n.test.ts',
             'apps/mobile/src/routes.test.ts',
             'apps/mobile/src/lib/kv.test.ts',
+            'apps/mobile/src/lib/sse.test.ts',
+            'apps/mobile/src/features/actions/fuzzyScore.test.ts',
+            'apps/mobile/src/features/actions/recents.test.ts',
+            'apps/mobile/src/features/matrix/matrixData.test.ts',
           ],
         },
       },

@@ -88,6 +88,23 @@ export class UnauthenticatedError extends Error {
 }
 
 /**
+ * A 401 recovery hook: try to refresh the credential, answer whether a retry is
+ * worth sending. Installed by src/auth/session.ts when the active provider can
+ * refresh (Entra: the stored refresh_token); absent for providers that cannot
+ * (the dev stub — its tokens outlive a dev session). Living HERE keeps the
+ * retry inside the one door: every call site inherits refresh-on-401 without
+ * knowing refresh exists.
+ */
+type UnauthorizedRetryHandler = () => Promise<boolean>
+
+let unauthorizedRetry: UnauthorizedRetryHandler | null = null
+
+/** Install (or clear, with null) the 401 refresh-retry hook. */
+export function setUnauthorizedRetry(next: UnauthorizedRetryHandler | null): void {
+  unauthorizedRetry = next
+}
+
+/**
  * Decode the server's error envelope. A non-envelope body (a proxy's HTML 502, a
  * truncated response) still yields a usable message rather than a parse crash.
  */
@@ -105,27 +122,55 @@ async function envelopeError(response: Response): Promise<ApiRequestError> {
   }
 }
 
+/**
+ * A fetch-shaped function the one door can be driven through. The DEFAULT is the
+ * global fetch; src/lib/sse.ts injects `expo/fetch` (the only fetch on this host
+ * that streams response bodies), and the node-side live proof injects node's
+ * fetch. The injection point changes the TRANSPORT only — origin, bearer, and
+ * envelope decoding still happen here, which is the whole point of the door.
+ */
+export type FetchImplementation = (url: string, init: RequestInit) => Promise<Response>
+
 export interface ApiFetchInit extends RequestInit {
   /** Liveness probes (/healthz) and the dev-token mint are the only unauthenticated calls. */
   readonly auth?: boolean
+  /** Transport override — see FetchImplementation. Defaults to the global fetch. */
+  readonly fetchImpl?: FetchImplementation
 }
 
 /**
  * Fetch against the API. Attaches `Authorization: Bearer <token>` unless `auth: false`,
  * and REJECTS rather than sending an unauthenticated request. Non-2xx responses throw an
  * ApiRequestError carrying the envelope message, so call sites branch on failure once.
+ *
+ * 401 handling: when a request that CARRIED a token still 401s, the installed
+ * refresh hook (setUnauthorizedRetry — wired by src/auth/session.ts for
+ * providers that can refresh) gets ONE chance to renew the credential, and the
+ * request is retried ONCE with the renewed token. One retry, never a loop: a
+ * second 401 means the credential is genuinely dead, and the failure must
+ * surface as the signed-out state it is.
  */
 export async function apiFetch(path: string, init: ApiFetchInit = {}): Promise<Response> {
-  const { auth = true, headers, ...rest } = init
-  const merged = new Headers(headers)
+  const { auth = true, fetchImpl, headers, ...rest } = init
+  const doFetch: FetchImplementation = fetchImpl ?? ((url, options) => fetch(url, options))
 
-  if (auth) {
-    const token = await tokenResolver()
-    if (token === null || token === '') throw new UnauthenticatedError()
-    merged.set('authorization', `Bearer ${token}`)
+  const send = async (): Promise<Response> => {
+    const merged = new Headers(headers)
+    if (auth) {
+      // Re-resolved per attempt ON PURPOSE: the retry must carry the token the
+      // refresh hook just stored, not the one that 401ed.
+      const token = await tokenResolver()
+      if (token === null || token === '') throw new UnauthenticatedError()
+      merged.set('authorization', `Bearer ${token}`)
+    }
+    return doFetch(`${API_ORIGIN}${path}`, { ...rest, headers: merged })
   }
 
-  const response = await fetch(`${API_ORIGIN}${path}`, { ...rest, headers: merged })
+  let response = await send()
+  if (response.status === 401 && auth && unauthorizedRetry !== null) {
+    const refreshed = await unauthorizedRetry()
+    if (refreshed) response = await send()
+  }
   if (!response.ok) throw await envelopeError(response)
   return response
 }

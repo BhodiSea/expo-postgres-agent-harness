@@ -8,10 +8,11 @@ import { Stack } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect } from 'react'
-import { createEntraProvider } from '../src/auth/providers/entra'
+import { createEntraProvider, entraConfigured } from '../src/auth/providers/entra'
 import { createStubProvider } from '../src/auth/providers/stub'
 import { installSessionProvider } from '../src/auth/session'
 import { ErrorBoundary } from '../src/components/ErrorBoundary'
+import { ToastProvider } from '../src/components/Toast'
 import { initI18n } from '../src/i18n/platform'
 import { initTheme, useTheme } from '../src/theme/theme'
 
@@ -28,11 +29,13 @@ SplashScreen.preventAutoHideAsync().catch(() => undefined)
 // (allowRTL + locale negotiation), and wire the session seam.
 initTheme()
 initI18n()
-// The provider seam is chosen ONCE, at boot. Dev: the stub authority
-// (POST /auth/dev-token). Release: Entra — whose factory currently THROWS
-// (PORT NOTE in providers/entra.ts, lands W4) rather than faking a session, so
-// a release build fails loudly at boot instead of shipping unauthenticated.
-installSessionProvider(__DEV__ ? createStubProvider() : createEntraProvider())
+// The provider seam is chosen ONCE, at boot, by CONFIGURATION, not build type:
+// when the Entra IDs are present (EXPO_PUBLIC_ENTRA_*) the real Entra provider
+// runs — in dev too, so the production flow is testable before release. Without
+// them, dev falls back to the stub authority (POST /auth/dev-token), and a
+// RELEASE build fails loudly at boot (createStubProvider throws outside
+// __DEV__) instead of shipping unauthenticated.
+installSessionProvider(entraConfigured() ? createEntraProvider() : createStubProvider())
 
 export default function RootLayout() {
   const { resolved } = useTheme()
@@ -46,9 +49,14 @@ export default function RootLayout() {
       {/* The status bar counter-colors the canvas (light glyphs on the dark
           theme) and tracks the store live. */}
       <StatusBar style={resolved === 'dark' ? 'light' : 'dark'} />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="actions" options={{ presentation: 'modal' }} />
-      </Stack>
+      {/* ToastProvider INSIDE the boundary (a toast bug must trip the fallback,
+          not unmount the root) and AROUND the navigator, so every screen and
+          modal shares one queue and one announcement channel. */}
+      <ToastProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="actions" options={{ presentation: 'modal' }} />
+        </Stack>
+      </ToastProvider>
     </ErrorBoundary>
   )
 }

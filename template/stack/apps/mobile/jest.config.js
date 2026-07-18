@@ -17,11 +17,15 @@ module.exports = {
     // tsc -b emits declaration files (including *.test.d.ts) here.
     '<rootDir>/dist/',
     // LOCKSTEP with the root vitest.config.ts unit-node include list: these
-    // three suites are pure (zero react-native in their import closure) and run
+    // suites are pure (zero react-native in their import closure) and run
     // under vitest — ignored here so no test ever runs under both runners.
     '<rootDir>/src/i18n/i18n\\.test\\.ts$',
     '<rootDir>/src/routes\\.test\\.ts$',
     '<rootDir>/src/lib/kv\\.test\\.ts$',
+    '<rootDir>/src/lib/sse\\.test\\.ts$',
+    '<rootDir>/src/features/actions/fuzzyScore\\.test\\.ts$',
+    '<rootDir>/src/features/actions/recents\\.test\\.ts$',
+    '<rootDir>/src/features/matrix/matrixData\\.test\\.ts$',
   ],
   // `json` writes coverage/coverage-final.json — the istanbul artifact the
   // diff-coverage step merges with the vitest map (both runners feed one floor).

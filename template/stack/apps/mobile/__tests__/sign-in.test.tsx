@@ -18,11 +18,22 @@ jest.mock('../src/host', () => {
     secureDeleteToken: jest.fn(async () => {
       token = null
     }),
+    secureGetRefreshToken: jest.fn(async () => null),
+    secureSetRefreshToken: jest.fn(async () => undefined),
+    secureDeleteRefreshToken: jest.fn(async () => undefined),
   }
 })
 
 const DEV_TOKEN = 'header.payload.signature-dev'
 const DEV_USER = '3f2c8f2a-0000-4000-8000-000000000001'
+
+// The screens behind a successful sign-in fetch (Home: notes + healthz) — the
+// mock server throws on any unhandled request, so the redirect target's
+// network must be declared too.
+const HOME_NETWORK = {
+  'GET /healthz': () => ({ status: 200, body: { ok: true, version: '0.0.0' } }),
+  'GET /api/notes': () => ({ status: 200, body: { items: [], nextCursor: null } }),
+}
 
 afterEach(() => {
   uninstallMockServer()
@@ -31,7 +42,7 @@ afterEach(() => {
 describe('dev sign-in', () => {
   it('mints a token from the stub authority, stores it host-side, and returns home', async () => {
     const mint = jest.fn(() => ({ status: 201, body: { token: DEV_TOKEN, userId: DEV_USER } }))
-    installMockServer({ 'POST /auth/dev-token': mint })
+    installMockServer({ ...HOME_NETWORK, 'POST /auth/dev-token': mint })
 
     renderRouter('./app', { initialUrl: '/sign-in' })
     fireEvent.press(await screen.findByTestId('sign-in-submit'))
@@ -43,7 +54,7 @@ describe('dev sign-in', () => {
 
   it('an invalid dev subject shows the inline field error and sends NOTHING', async () => {
     const mint = jest.fn(() => ({ status: 201, body: { token: DEV_TOKEN, userId: DEV_USER } }))
-    installMockServer({ 'POST /auth/dev-token': mint })
+    installMockServer({ ...HOME_NETWORK, 'POST /auth/dev-token': mint })
 
     renderRouter('./app', { initialUrl: '/sign-in' })
     fireEvent.changeText(await screen.findByLabelText(t('signin.subject.label')), 'not-a-uuid')
@@ -55,6 +66,7 @@ describe('dev sign-in', () => {
 
   it('a failed mint surfaces TRANSLATED copy from the envelope code, as role=alert', async () => {
     installMockServer({
+      ...HOME_NETWORK,
       'POST /auth/dev-token': () => ({
         status: 500,
         body: { error: { code: 'internal', message: 'boom' } },
@@ -67,5 +79,33 @@ describe('dev sign-in', () => {
     const failure = await screen.findByTestId('sign-in-failure')
     // The catalog copy for the stable code — never the server's raw "boom".
     expect(failure).toHaveTextContent(t('error.api.internal'))
+  })
+})
+
+describe('entra-mode sign-in render', () => {
+  // The MODE probe (entraConfigured) reads the EXPO_PUBLIC_ IDs per call, so
+  // setting them here flips the SCREEN into entra mode. Render-only on
+  // purpose: the PKCE prompt needs a browser + an identity provider — faking
+  // those would test the fake (the provider's pure seams are covered in
+  // entra.test.ts; the interactive flow belongs to a credentialed e2e lane).
+  beforeEach(() => {
+    process.env['EXPO_PUBLIC_ENTRA_TENANT_ID'] = '11111111-2222-3333-4444-555555555555'
+    process.env['EXPO_PUBLIC_ENTRA_CLIENT_ID'] = '66666666-7777-8888-9999-aaaaaaaaaaaa'
+  })
+
+  afterEach(() => {
+    delete process.env['EXPO_PUBLIC_ENTRA_TENANT_ID']
+    delete process.env['EXPO_PUBLIC_ENTRA_CLIENT_ID']
+  })
+
+  it('renders the Microsoft sign-in affordance instead of the dev subject form', async () => {
+    installMockServer({ ...HOME_NETWORK })
+    renderRouter('./app', { initialUrl: '/sign-in' })
+
+    expect(await screen.findByTestId('sign-in-entra')).toBeTruthy()
+    expect(screen.getByText(t('signin.entra.body'))).toBeTruthy()
+    // The dev-only subject field must NOT ship on the entra surface.
+    expect(screen.queryByTestId('sign-in-subject')).toBeNull()
+    expect(screen.queryByTestId('sign-in-submit')).toBeNull()
   })
 })

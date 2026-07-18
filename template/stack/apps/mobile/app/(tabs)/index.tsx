@@ -1,21 +1,35 @@
+import { router, useLocalSearchParams } from 'expo-router'
 import { useEffect } from 'react'
+import { View } from 'react-native'
 import { AppText } from '../../src/components/AppText'
-import { EmptyState } from '../../src/components/EmptyState'
+import { Button } from '../../src/components/Button'
 import { Screen } from '../../src/components/Screen'
+import { ConnectionStatus } from '../../src/features/connection/ConnectionStatus'
+import { NotesPanel } from '../../src/features/notes/NotesPanel'
 import { useI18n } from '../../src/i18n'
 import { stampBootTiming } from '../../src/lib/boot-timing'
-import { ROUTES } from '../../src/routes'
+import { type Palette, useThemedStyles } from '../../src/theme/theme'
 
-// ROUTES is a literal tuple; entry 0 IS the home entry (id 'home') — indexing
-// keeps the states testIDs literal-typed instead of widening through a find().
-const HOME = ROUTES[0]
+const homeStyles = (_palette: Palette) => ({
+  header: {
+    alignItems: 'center' as const,
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+  },
+})
 
-// Placeholder Home screen — the real notes feature lands next workstream.
-// Honest minimalism: with no query yet, EMPTY is the only truthful data state,
-// so only states.empty renders; states.loading/states.error arm when the list
-// query exists (the route-manifest gate will then hold all three).
+// The home screen: the notes vertical slice. Its ROUTES entry's states
+// (home-loading/-empty/-error) all live inside NotesPanel, driven by
+// useListQuery over the real api-client — the route-manifest contract holds
+// with three REACHABLE states now, not a placeholder's honest-empty.
+//
+// Header row: the screen title, the healthz connection indicator (the
+// degraded-network surface), and the entry point to the actions modal.
 export default function HomeScreen() {
   const { t } = useI18n()
+  const styles = useThemedStyles(homeStyles)
+  // The actions modal's "Create a note" deep-links here with ?focus=composer.
+  const { focus } = useLocalSearchParams<{ focus?: string }>()
   useEffect(() => {
     // First screen on-screen == interactive: the one honest place to stamp
     // cold-start (stamp-once; see src/lib/boot-timing.ts).
@@ -23,13 +37,19 @@ export default function HomeScreen() {
   }, [])
   return (
     <Screen testID="home-screen">
-      <AppText variant="title">{t('home.title')}</AppText>
-      <AppText variant="muted">{t('home.body')}</AppText>
-      <EmptyState
-        testID={HOME.states.empty}
-        title={t('home.empty.title')}
-        description={t('home.empty.description')}
-      />
+      <View style={styles.header}>
+        <AppText variant="title">{t('route.home')}</AppText>
+        <Button
+          variant="ghost"
+          label={t('route.actions')}
+          testID="open-actions"
+          onPress={() => {
+            router.push('/actions')
+          }}
+        />
+      </View>
+      <ConnectionStatus />
+      <NotesPanel autoFocusComposer={focus === 'composer'} />
     </Screen>
   )
 }

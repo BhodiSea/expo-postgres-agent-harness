@@ -61,7 +61,9 @@ catalog:
   # number, so the whole set rides one ~57 line and upgrades move together
   # (design record: EXPO-FACTS; pins verified against npm 2026-07-18).
   expo: ~57.0.7
+  expo-auth-session: ~57.0.4 # Entra PKCE (src/auth/providers/entra.ts); pulls expo-application/expo-crypto/expo-web-browser as its own deps
   expo-constants: ~57.0.6
+  expo-crypto: ~57.0.1 # PKCE digest backend for expo-auth-session (native module, no config plugin)
   expo-linking: ~57.0.3
   expo-localization: ~57.0.1
   expo-router: ~57.0.7
@@ -69,6 +71,7 @@ catalog:
   expo-splash-screen: ~57.0.4
   expo-sqlite: ~57.0.1
   expo-status-bar: ~57.0.1
+  expo-web-browser: ~57.0.1 # the auth-session browser surface; its config plugin is a no-op without props, so it is NOT in app.config plugins
   babel-preset-expo: ~57.0.3
   jest-expo: ~57.0.2
   # react-native + native companions: pinned exactly as expo@57's own

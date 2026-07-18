@@ -198,8 +198,8 @@ describe('pseudo-locale', () => {
   })
 
   it('expands the text ~30%, so a layout that clips German clips here too', () => {
-    const source = en['home.body']
-    const expanded = pseudo['home.body']
+    const source = en['signin.body']
+    const expanded = pseudo['signin.body']
     expect(typeof expanded).toBe('string')
     expect((expanded as string).length).toBeGreaterThan(source.length * 1.2)
   })
@@ -207,10 +207,10 @@ describe('pseudo-locale', () => {
 
 describe('locale switching', () => {
   it('switching the locale swaps the active catalog for every subsequent t()', () => {
-    expect(t('home.empty.title')).toBe('No notes yet')
+    expect(t('notes.empty.title')).toBe('No notes yet')
     switchLocale('en-XA')
-    expect(t('home.empty.title')).not.toBe('No notes yet')
-    expect(t('home.empty.title')).toBe(translate('en-XA', 'home.empty.title'))
+    expect(t('notes.empty.title')).not.toBe('No notes yet')
+    expect(t('notes.empty.title')).toBe(translate('en-XA', 'notes.empty.title'))
   })
 
   it('every declared locale resolves every key (no silent English fallback)', () => {

@@ -2,11 +2,24 @@
 // an accessible name, the field trio (label / hint / alert) stays wired. These
 // are the invariants the a11y lint + on-device sweeps assume; pinning them at
 // the primitive level means every consumer inherits them for free.
-import { render, screen } from '@testing-library/react-native'
+//
+// W4 extensions: the Toast (announcement + dismiss contract), the matrix
+// per-row role/label contract, and the perf subject's countable cell markers —
+// plus the LEAF-TESTID rule those components are authored under: a testID rides
+// an interactive/accessible element or a STYLED container, never a bare
+// layout-only View, because Fabric view flattening can detach the latter on
+// device (design record: CI-LANE-FACTS).
+import { fireEvent, render, screen } from '@testing-library/react-native'
+import { AccessibilityInfo, Text } from 'react-native'
 import { Button } from '../src/components/Button'
 import { EmptyState } from '../src/components/EmptyState'
 import { Field } from '../src/components/Field'
 import { Input } from '../src/components/Input'
+import { ToastProvider, useToast } from '../src/components/Toast'
+import { MatrixList } from '../src/features/matrix/MatrixList'
+import { MATRIX_COLUMNS, makeSyntheticRows } from '../src/features/matrix/matrixData'
+import { PerfSubject } from '../src/features/matrix/perfSubject'
+import { en } from '../src/i18n/catalog'
 
 describe('Button', () => {
   it('exposes role=button with its label as the accessible name', () => {
@@ -69,5 +82,78 @@ describe('EmptyState', () => {
       <EmptyState title="Nothing" description="Yet" cta={{ label: 'Create', onPress: jest.fn() }} />,
     )
     expect(screen.getByRole('button', { name: 'Create' })).toBeTruthy()
+  })
+})
+
+// A trigger child so the toast is driven through the PUBLIC api (useToast).
+function ToastTrigger({ message, tone }: { readonly message: string; readonly tone: 'error' }) {
+  const toast = useToast()
+  return (
+    <Text
+      accessibilityRole="button"
+      testID="toast-trigger"
+      onPress={() => {
+        toast.show(message, tone)
+      }}
+    >
+      {message}
+    </Text>
+  )
+}
+
+describe('Toast', () => {
+  it('ANNOUNCES the message through AccessibilityInfo — the toast lives outside the focus path', () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility')
+    render(
+      <ToastProvider>
+        <ToastTrigger message="Your write was lost" tone="error" />
+      </ToastProvider>,
+    )
+    fireEvent.press(screen.getByTestId('toast-trigger'))
+    expect(announce).toHaveBeenCalledWith('Your write was lost')
+    // The visible message rides an accessible Text LEAF with the tone-keyed
+    // testID (never a bare wrapper View — Fabric flattening).
+    expect(screen.getByTestId('toast-error')).toHaveTextContent('Your write was lost')
+    announce.mockRestore()
+  })
+
+  it('every toast carries a catalog-named dismiss button that removes it', () => {
+    render(
+      <ToastProvider>
+        <ToastTrigger message="Ephemeral" tone="error" />
+      </ToastProvider>,
+    )
+    fireEvent.press(screen.getByTestId('toast-trigger'))
+    const dismiss = screen.getByRole('button', { name: en['common.dismiss'] })
+    fireEvent.press(dismiss)
+    expect(screen.queryByTestId('toast-error')).toBeNull()
+  })
+})
+
+describe('MatrixList a11y contract', () => {
+  it('exposes ONE labelled role=row element per data row, plus the list label + pagination hint', () => {
+    const rows = makeSyntheticRows(3)
+    render(<MatrixList rows={rows} columns={MATRIX_COLUMNS} onEndReached={jest.fn()} />)
+    const rendered = screen.getAllByRole('row')
+    expect(rendered).toHaveLength(3)
+    for (const [index, row] of rows.entries()) {
+      expect(rendered[index]?.props['accessibilityLabel'] as string).toBe(row.label)
+    }
+    const list = screen.getByTestId('matrix-list')
+    expect(list.props['accessibilityLabel'] as string).toBe(en['matrix.list'])
+    expect(list.props['accessibilityHint'] as string).toBe(en['matrix.pagination.hint'])
+  })
+})
+
+describe('PerfSubject', () => {
+  it('materializes EVERY cell with the countable role=cell marker (the W5 perf-gate contract)', () => {
+    const cells = 120
+    render(<PerfSubject cells={cells} />)
+    const rowCount = Math.round(cells / MATRIX_COLUMNS.length)
+    expect(screen.getAllByRole('cell')).toHaveLength(rowCount * MATRIX_COLUMNS.length)
+    // Row count via the rowheader TEXTS (Texts are accessibility elements; the
+    // subject's plain row Views deliberately are not — no `accessible` prop, so
+    // the render stays a pure materialization measurement).
+    expect(screen.getAllByRole('rowheader')).toHaveLength(rowCount)
   })
 })

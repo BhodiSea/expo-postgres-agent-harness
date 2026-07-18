@@ -2,8 +2,31 @@
 // renderRouter('./app') mounts the actual _layout.tsx — polyfills, module-scope
 // boot (theme/i18n/session wiring), splash hold, tabs — against the mocked
 // native layer. If any seam throws at import or first render, this is the suite
-// that goes red first.
+// that goes red first. Home now carries the real notes query + healthz probe,
+// so the boot smoke declares that network on the mock server (an unhandled
+// request throws by design).
 import { renderRouter, screen } from 'expo-router/testing-library'
+import { installMockServer, uninstallMockServer } from '../src/testing/mock-server'
+
+jest.mock('../src/host', () => ({
+  secureGetToken: jest.fn(async () => 'jest-session-token'),
+  secureSetToken: jest.fn(async () => undefined),
+  secureDeleteToken: jest.fn(async () => undefined),
+  secureGetRefreshToken: jest.fn(async () => null),
+  secureSetRefreshToken: jest.fn(async () => undefined),
+  secureDeleteRefreshToken: jest.fn(async () => undefined),
+}))
+
+beforeEach(() => {
+  installMockServer({
+    'GET /healthz': () => ({ status: 200, body: { ok: true, version: '0.0.0' } }),
+    'GET /api/notes': () => ({ status: 200, body: { items: [], nextCursor: null } }),
+  })
+})
+
+afterEach(() => {
+  uninstallMockServer()
+})
 
 describe('root layout boot', () => {
   it('mounts the real app tree without throwing and lands on Home', async () => {
