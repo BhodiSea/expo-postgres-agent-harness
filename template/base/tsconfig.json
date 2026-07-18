@@ -1,0 +1,14 @@
+{
+  // Solution file: `tsc -b` walks these references; it compiles nothing itself.
+  // Every workspace tsconfig extends ./tsconfig.base.json and sets composite: true.
+  "files": [],
+  "references": [
+    { "path": "packages/contracts" },
+    { "path": "packages/schema" },
+    { "path": "packages/importer" },
+    { "path": "packages/eval" },
+    { "path": "apps/server" }
+    // W3: { "path": "apps/mobile" } lands with the Expo app workspace. It must not
+    // be listed before the project exists — `tsc -b` fails on a missing reference.
+  ]
+}

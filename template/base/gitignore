@@ -18,7 +18,7 @@ test-results/
 .env
 .env.*
 !.env.example
-# dev-only JWKS + minted tokens (apps/server/scripts/mint-dev-token.mjs)
+# dev-only JWKS + minted tokens (the mint-dev-token CLI and the /auth/dev-token route)
 .dev-auth/
 # store/signing material must never enter the tree (EAS credentials service owns it)
 *.keystore
