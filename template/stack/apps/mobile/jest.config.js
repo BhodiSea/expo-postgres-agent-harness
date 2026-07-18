@@ -20,6 +20,14 @@ const PER_FILE_FLOORS = {
 
 module.exports = {
   preset: 'jest-expo',
+  // Jest's 5000ms default is calibrated for unit tests on developer hardware.
+  // The heavy RNTL flow tests (matrix pagination, notes optimistic-create)
+  // legitimately cross 5s on 2-core CI runners under coverage instrumentation
+  // (observed: whole jest-expo suites take 12-16s there; both selftest canary
+  // jobs reddened on exactly these two tests while passing locally). 30s keeps
+  // genuinely-hung tests failing while giving slow-runner flows headroom;
+  // RNTL waitFor's own 1s timeout still bounds each individual assertion.
+  testTimeout: 30000,
   // pnpm keeps the real packages under node_modules/.pnpm/<pkg>@<v>/node_modules/,
   // so the must-be-transformed lookahead needs `.pnpm` in the set — without it
   // every RN/Expo module is served untranspiled and the suite dies on ESM/JSX
