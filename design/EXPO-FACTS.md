@@ -76,10 +76,14 @@ data per catalog locale). The i18n module must NOT rely on
   `node_modules/(?!(.pnpm|(jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|...))`.
   (https://docs.expo.dev/develop/unit-testing/)
 - `expo export` → `dist/`: native bundles at
-  `dist/_expo/static/js/{ios,android}/index-<hash>.hbc` (**Hermes bytecode by
-  default**; `--no-bytecode` for plain JS), `metadata.json` at dist root,
-  sourcemaps only with `--source-maps`. bundle-measure logical chunk keys:
-  platform dir + extension (e.g. `android/index.hbc`).
+  `dist/_expo/static/js/{ios,android}/entry-<hash>.hbc` (**Hermes bytecode by
+  default** — basename follows the entry module, `entry` for
+  `expo-router/entry`; `--no-bytecode` for plain JS), `metadata.json` at dist
+  root, assets content-addressed under `dist/assets/<md5>`, sourcemaps only
+  with `--source-maps`. bundle-measure logical chunk keys: platform dir +
+  extension (e.g. `android/entry.hbc`). EMPIRICALLY CONFIRMED in the W3
+  scaffold (Hermes bytecode v98; hash byte-identical across two fresh
+  scaffolds — the ratchet's determinism premise holds).
   (https://docs.expo.dev/guides/analyzing-bundles/)
 - `expo-sqlite/kv-store`: `import Storage from 'expo-sqlite/kv-store'` with
   `getItemSync`/`setItemSync`/`removeItemSync`/`clearSync` — current, drop-in

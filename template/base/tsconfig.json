@@ -7,8 +7,7 @@
     { "path": "packages/schema" },
     { "path": "packages/importer" },
     { "path": "packages/eval" },
-    { "path": "apps/server" }
-    // W3: { "path": "apps/mobile" } lands with the Expo app workspace. It must not
-    // be listed before the project exists — `tsc -b` fails on a missing reference.
+    { "path": "apps/server" },
+    { "path": "apps/mobile" }
   ]
 }

@@ -57,7 +57,40 @@ catalog:
   react-dom: ^19.2.7 # the Expo web preview renders through react-native-web/react-dom
   '@types/react': ^19.2.17
   '@types/react-dom': ^19.2.3
-  # W3: expo/react-native pins land here (expo SDK, react-native, jest-expo,
-  # @testing-library/react-native, expo-secure-store, …)
+  # Expo SDK 57 line. Since SDK 55 every expo-* package's MAJOR tracks the SDK
+  # number, so the whole set rides one ~57 line and upgrades move together
+  # (design record: EXPO-FACTS; pins verified against npm 2026-07-18).
+  expo: ~57.0.7
+  expo-constants: ~57.0.6
+  expo-linking: ~57.0.3
+  expo-localization: ~57.0.1
+  expo-router: ~57.0.7
+  expo-secure-store: ~57.0.1
+  expo-splash-screen: ~57.0.4
+  expo-sqlite: ~57.0.1
+  expo-status-bar: ~57.0.1
+  babel-preset-expo: ~57.0.3
+  jest-expo: ~57.0.2
+  # react-native + native companions: pinned exactly as expo@57's own
+  # bundledNativeModules.json expects them — `expo install --check` (the
+  # native-deps gate) reds drift, so the catalog mirrors its ranges verbatim.
+  react-native: 0.86.0
+  react-native-safe-area-context: ~5.7.0
+  react-native-screens: 4.25.2 # exact: bundledNativeModules pins it exact
+  # jest-expo 57 is a jest-29 preset (its babel-jest/@jest/* internals are ^29);
+  # jest 30 would split the runner and the preset internals across majors.
+  jest: ~29.7.0
+  '@types/jest': ^29.5.14
+  # >= 13.2 per expo-router/testing-library. 14.x swaps the react-test-renderer
+  # peer for the new `test-renderer` package — that migration is a deliberate
+  # later bump, not a Renovate drive-by.
+  '@testing-library/react-native': ~13.3.3
+  react-test-renderer: ^19.2.7 # rides the react pin exactly (peer: react ^19.2.7)
+  # Hermes Intl gaps (EXPO-FACTS): PluralRules/RelativeTimeFormat/Locale are
+  # polyfilled unconditionally in apps/mobile/src/i18n/polyfills.ts.
+  '@formatjs/intl-getcanonicallocales': ^3.2.11
+  '@formatjs/intl-locale': ^5.3.10
+  '@formatjs/intl-pluralrules': ^6.3.13
+  '@formatjs/intl-relativetimeformat': ^12.3.13
   # ---- harness runtime (root tools/mcp + tests/rls) -----------------------------
   '@modelcontextprotocol/sdk': ^1.29.0

@@ -9,7 +9,9 @@ import { defineConfig } from 'vitest/config'
 //              in CI). Plain `vitest run` therefore stays green without a database.
 // apps/mobile component/screen tests are NOT a vitest project: react-native code
 // does not run under vitest without a fragile transform pipeline, so they run
-// under jest-expo (the mobile-unit step in tools/harness.config.mjs; lands in W3).
+// under jest-expo (the mobile-unit step in tools/harness.config.mjs). The PURE
+// mobile modules — import closure reaches zero react-native/expo native code —
+// DO run here, listed file-by-file in the unit-node include below.
 // Tests are colocated as *.test.ts or live under <workspace>/tests/unit/.
 
 // Source files the UNIT-coverage bar cannot measure honestly — excluded from
@@ -79,6 +81,16 @@ export default defineConfig({
             'packages/*/tests/unit/**/*.test.ts',
             'apps/server/src/**/*.test.ts',
             'apps/server/tests/unit/**/*.test.ts',
+            // apps/mobile PURE suites — an explicit FILE list, never a glob.
+            // The runner split: a mobile module (and its test) belongs to vitest
+            // ONLY when its import closure reaches zero react-native/expo native
+            // code (this Node runner has no RN transform pipeline); everything
+            // touching react-native runs under jest-expo. LOCKSTEP:
+            // apps/mobile/jest.config.js testPathIgnorePatterns names exactly
+            // these three paths so no suite ever runs under both runners.
+            'apps/mobile/src/i18n/i18n.test.ts',
+            'apps/mobile/src/routes.test.ts',
+            'apps/mobile/src/lib/kv.test.ts',
           ],
         },
       },
