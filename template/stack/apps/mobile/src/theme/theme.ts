@@ -14,6 +14,7 @@ import { type Palette, palettes, type ResolvedThemeName } from './tokens.gen'
 // SOURCE: the OS color scheme is a read-only signal — persisting an explicit
 // override layered over it is the app's own responsibility
 // [corpus: web/prefers-color-scheme]
+/** @public — seam API: the persisted preference vocabulary (test-asserted; consumers narrow with it). */
 export type ThemePreference = 'light' | 'dark' | 'system'
 
 const STORAGE_KEY = 'theme'
@@ -79,6 +80,7 @@ export function initTheme(): void {
   systemSubscription = Appearance.addChangeListener(onSystemChange)
 }
 
+/** @public — seam API: a settings screen sets an explicit preference; the shipped chrome only cycles. */
 export function setThemePreference(next: ThemePreference): void {
   preference = next
   kvSet(STORAGE_KEY, next)
@@ -93,6 +95,7 @@ const CYCLE: Record<ThemePreference, ThemePreference> = {
   dark: 'system',
 }
 
+/** @public — seam API: the pure cycle step, exported for tests and custom toggles. */
 export function nextPreference(current: ThemePreference): ThemePreference {
   return CYCLE[current]
 }

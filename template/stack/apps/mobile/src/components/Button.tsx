@@ -15,6 +15,8 @@ interface ButtonProps {
   readonly onPress: () => void
   readonly variant?: ButtonVariant
   readonly disabled?: boolean
+  /** What pressing DOES, when the label alone does not say (announced after the name). */
+  readonly accessibilityHint?: string
   readonly testID?: string
 }
 
@@ -56,12 +58,20 @@ const buttonStyles = (palette: Palette) => ({
   },
 })
 
-export function Button({ label, onPress, variant = 'solid', disabled = false, testID }: ButtonProps) {
+export function Button({
+  label,
+  onPress,
+  variant = 'solid',
+  disabled = false,
+  accessibilityHint,
+  testID,
+}: ButtonProps) {
   const styles = useThemedStyles(buttonStyles)
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}

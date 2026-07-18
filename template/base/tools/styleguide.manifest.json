@@ -95,7 +95,15 @@
     "spacing": { "unit": 4 }
   },
   "controlPrimitives": {
-    "tags": ["Pressable", "TouchableOpacity", "TouchableHighlight", "TouchableWithoutFeedback", "TextInput", "Button", "Switch"],
+    "tags": [
+      "Pressable",
+      "TouchableOpacity",
+      "TouchableHighlight",
+      "TouchableWithoutFeedback",
+      "TextInput",
+      "Button",
+      "Switch"
+    ],
     "home": "apps/mobile/src/components"
   },
   "controlAllow": [],

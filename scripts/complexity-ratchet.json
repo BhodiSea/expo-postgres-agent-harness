@@ -9,6 +9,9 @@
     "installer/lib/merge-claude-settings.mjs::mergeClaudeSettings": 19,
     "installer/lib/merge-workspace-yaml.mjs::parseSimpleYaml": 24,
     "scripts/check-reuse.mjs::parseReuseToml": 24,
-    "scripts/check-reuse.mjs::reuseProblems": 22
+    "scripts/check-reuse.mjs::reuseProblems": 22,
+    "template/base/tools/check-expo-policy.mjs::checkEasJson": 16,
+    "template/base/tools/lib/agent-roster.mjs::parseFrontmatter": 29,
+    "template/base/tools/lib/jsonc.mjs::parseJsonc": 24
   }
 }

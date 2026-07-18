@@ -28,7 +28,7 @@ export function kvSet(key: string, value: string): void {
   }
 }
 
-/** Delete a value; absence is the goal, so an unreachable store already counts. */
+/** Delete a value; absence is the goal, so an unreachable store already counts. @public — seam API (test-driven; features delete through their own stores). */
 export function kvDelete(key: string): void {
   try {
     Storage.removeItemSync(key)

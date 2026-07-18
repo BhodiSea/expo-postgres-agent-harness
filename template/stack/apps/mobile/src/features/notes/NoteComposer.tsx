@@ -43,7 +43,12 @@ const composerStyles = (_palette: Palette) => ({
   },
 })
 
-export function NoteComposer({ status, fieldError, onSubmit, autoFocus = false }: NoteComposerProps) {
+export function NoteComposer({
+  status,
+  fieldError,
+  onSubmit,
+  autoFocus = false,
+}: NoteComposerProps) {
   const [title, setTitle] = useState('')
   const { t } = useI18n()
   const styles = useThemedStyles(composerStyles)

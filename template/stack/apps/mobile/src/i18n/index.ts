@@ -31,6 +31,7 @@ import { pseudoCatalog } from './pseudo'
  */
 export type Locale = 'en' | 'en-XA' | 'ar-XB'
 
+/** @public — test-facing seam API: the vitest i18n suite enumerates locales; production code resolves one. */
 export const LOCALES: readonly Locale[] = ['en', 'en-XA', 'ar-XB']
 
 const CATALOGS: Readonly<Record<Locale, Catalog>> = {
@@ -52,6 +53,7 @@ const RTL_LANGUAGES = new Set(['ar', 'he', 'fa', 'ur', 'ps', 'sd', 'ug', 'yi', '
 
 export type Direction = 'ltr' | 'rtl'
 
+/** @public — test-facing seam API: the direction suite pins the rtl/ltr answers directly. */
 export function directionOf(locale: Locale): Direction {
   try {
     const info = new Intl.Locale(locale)
@@ -60,7 +62,10 @@ export function directionOf(locale: Locale): Direction {
     // private-use region ('ar-XB') the direction data does not key on — the
     // @formatjs implementation answers 'ltr' for the full tag but 'rtl' for
     // the bare 'ar' (measured; the vitest direction suite pins this).
-    const base = new Intl.Locale(info.language) as Intl.Locale & {
+    // Typed with getTextInfo OPTIONAL — it is a polyfill-provided extension on this
+    // host (polyfills.ts), so the platform lib type must not promise it exists and
+    // the optional chain below stays honest.
+    const base = new Intl.Locale(info.language) as {
       getTextInfo?: () => { direction: string }
     }
     const direction = base.getTextInfo?.().direction
@@ -210,6 +215,7 @@ export function formatCellValue(value: number): string {
     : formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+/** @public — seam API: reached from tests today; the formatting door features must use, never Intl. */
 export function formatDate(iso: string, options?: Intl.DateTimeFormatOptions): string {
   const key = `${current}|${JSON.stringify(options ?? {})}`
   let formatter = dateFormats.get(key)
@@ -266,6 +272,7 @@ export type TranslationParams = Readonly<Record<string, string | number>>
  * `?? en[key]` — is what guarantees completeness. Adding a message and forgetting a locale is a
  * COMPILE error. A silent English fallback would have turned that compile error into a shipped
  * bug that only a native speaker of the other language would ever notice.
+ * @public — test-facing seam API: the vitest suite drives every locale explicitly; components use t()/useI18n.
  */
 export function translate(locale: Locale, key: MessageKey, params?: TranslationParams): string {
   const template = resolve(locale, CATALOGS[locale][key], params)

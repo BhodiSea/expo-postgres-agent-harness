@@ -1,6 +1,23 @@
 // jest.config.js — the react-native component/screen half of the unit floor
 // (jest-expo preset). PURE mobile modules run under the ROOT vitest config
 // instead; the runner split is documented there (vitest.config.ts unit-node).
+
+// DIFF-COVERAGE FLOORS — parsed fail-closed by tools/check-diff-coverage.mjs
+// (the Stop chain's diff-coverage step): every CHANGED file this config measures
+// must clear these per-file percentages, read from coverage/coverage-final.json.
+// LOCKSTEP with the PER_FILE_FLOORS block in the root vitest.config.ts — one
+// floor, two runners; the values mirror it by design. They double as the jest
+// aggregate threshold below (the reference that keeps this const live), so the
+// gate's parse and jest's own enforcement can never disagree. Raising floors as
+// real coverage grows is a reviewed human decision — this config is
+// write-guard-protected.
+const PER_FILE_FLOORS = {
+  statements: 50,
+  branches: 40,
+  functions: 45,
+  lines: 50,
+}
+
 module.exports = {
   preset: 'jest-expo',
   // pnpm keeps the real packages under node_modules/.pnpm/<pkg>@<v>/node_modules/,
@@ -30,6 +47,9 @@ module.exports = {
   // `json` writes coverage/coverage-final.json — the istanbul artifact the
   // diff-coverage step merges with the vitest map (both runners feed one floor).
   coverageReporters: ['json', 'text-summary'],
+  // The floors const doubles as jest's own aggregate enforcement, so the gate's
+  // textual parse and the runner's threshold can never disagree.
+  coverageThreshold: { global: PER_FILE_FLOORS },
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
     'app/**/*.{ts,tsx}',

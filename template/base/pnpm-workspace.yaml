@@ -53,26 +53,33 @@ catalog:
   drizzle-kit: 0.31.10 # exact: kit releases have changed migration layout mid-minor
   '@types/node': ^22.20.1 # matches the node >=22 engines floor
   # ---- mobile -----------------------------------------------------------------
-  react: ^19.2.7
-  react-dom: ^19.2.7 # the Expo web preview renders through react-native-web/react-dom
+  # react/react-dom exact: expo@57's bundledNativeModules expects 19.2.3 —
+  # `expo install --check` (the native-deps gate) reds any drift, so the
+  # catalog mirrors it verbatim (same doctrine as react-native below).
+  react: 19.2.3
+  react-dom: 19.2.3 # the Expo web preview renders through react-native-web/react-dom
   '@types/react': ^19.2.17
   '@types/react-dom': ^19.2.3
   # Expo SDK 57 line. Since SDK 55 every expo-* package's MAJOR tracks the SDK
   # number, so the whole set rides one ~57 line and upgrades move together
   # (design record: EXPO-FACTS; pins verified against npm 2026-07-18).
-  expo: ~57.0.7
+  expo: 57.0.7 # exact: version-sync's exact-pin set (expo/expo-router/react-native/babel-preset-expo/drizzle-kit)
   expo-auth-session: ~57.0.4 # Entra PKCE (src/auth/providers/entra.ts); pulls expo-application/expo-crypto/expo-web-browser as its own deps
   expo-constants: ~57.0.6
   expo-crypto: ~57.0.1 # PKCE digest backend for expo-auth-session (native module, no config plugin)
   expo-linking: ~57.0.3
   expo-localization: ~57.0.1
-  expo-router: ~57.0.7
+  expo-router: 57.0.7 # exact: version-sync's exact-pin set
   expo-secure-store: ~57.0.1
   expo-splash-screen: ~57.0.4
   expo-sqlite: ~57.0.1
   expo-status-bar: ~57.0.1
+  expo-system-ui: ~57.0.1 # backs userInterfaceStyle (root view background / appearance) — required for the automatic light/dark surface on Android
+  # expo-updates is deliberately NOT in the base catalog: OTA machinery must not
+  # ride into every install — the eas-update opt-in module adds the dep (and
+  # knip.json carries the matching ignoreDependencies entry until then).
   expo-web-browser: ~57.0.1 # the auth-session browser surface; its config plugin is a no-op without props, so it is NOT in app.config plugins
-  babel-preset-expo: ~57.0.3
+  babel-preset-expo: 57.0.3 # exact: version-sync's exact-pin set
   jest-expo: ~57.0.2
   # react-native + native companions: pinned exactly as expo@57's own
   # bundledNativeModules.json expects them — `expo install --check` (the
@@ -88,7 +95,7 @@ catalog:
   # peer for the new `test-renderer` package — that migration is a deliberate
   # later bump, not a Renovate drive-by.
   '@testing-library/react-native': ~13.3.3
-  react-test-renderer: ^19.2.7 # rides the react pin exactly (peer: react ^19.2.7)
+  react-test-renderer: 19.2.3 # exact: RTL's ensure-peer-deps demands react === react-test-renderer (equal to the react pin above)
   # Hermes Intl gaps (EXPO-FACTS): PluralRules/RelativeTimeFormat/Locale are
   # polyfilled unconditionally in apps/mobile/src/i18n/polyfills.ts.
   '@formatjs/intl-getcanonicallocales': ^3.2.11

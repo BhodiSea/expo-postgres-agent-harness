@@ -20,12 +20,12 @@ import {
 } from '../src/testing/mock-server'
 
 jest.mock('../src/host', () => ({
-  secureGetToken: jest.fn(async () => 'jest-session-token'),
-  secureSetToken: jest.fn(async () => undefined),
-  secureDeleteToken: jest.fn(async () => undefined),
-  secureGetRefreshToken: jest.fn(async () => null),
-  secureSetRefreshToken: jest.fn(async () => undefined),
-  secureDeleteRefreshToken: jest.fn(async () => undefined),
+  secureGetToken: jest.fn(() => Promise.resolve('jest-session-token')),
+  secureSetToken: jest.fn(() => Promise.resolve()),
+  secureDeleteToken: jest.fn(() => Promise.resolve()),
+  secureGetRefreshToken: jest.fn(() => Promise.resolve(null)),
+  secureSetRefreshToken: jest.fn(() => Promise.resolve()),
+  secureDeleteRefreshToken: jest.fn(() => Promise.resolve()),
 }))
 
 const HOME = ROUTES[0]
@@ -61,36 +61,35 @@ afterEach(() => {
 
 const NETWORK_ROUTES = [HOME, MATRIX] as const
 
-describe.each(NETWORK_ROUTES.map((route) => [route.id, route] as const))(
-  'route %s canonical states',
-  (_id, route) => {
-    it(`held query renders ${route.states.loading}`, async () => {
-      installFor('held')
-      renderRouter('./app', { initialUrl: route.path })
-      expect(await screen.findByTestId(route.states.loading)).toBeTruthy()
-    })
+describe.each(
+  NETWORK_ROUTES.map((route) => [route.id, route] as const),
+)('route %s canonical states', (_id, route) => {
+  it(`held query renders ${route.states.loading}`, async () => {
+    installFor('held')
+    renderRouter('./app', { initialUrl: route.path })
+    expect(await screen.findByTestId(route.states.loading)).toBeTruthy()
+  })
 
-    it(`zero items render ${route.states.empty}`, async () => {
-      installFor('empty')
-      renderRouter('./app', { initialUrl: route.path })
-      expect(await screen.findByTestId(route.states.empty)).toBeTruthy()
-    })
+  it(`zero items render ${route.states.empty}`, async () => {
+    installFor('empty')
+    renderRouter('./app', { initialUrl: route.path })
+    expect(await screen.findByTestId(route.states.empty)).toBeTruthy()
+  })
 
-    it(`a 500 envelope renders ${route.states.error} CONTAINING a retry that recovers`, async () => {
-      installFor('error')
-      renderRouter('./app', { initialUrl: route.path })
-      const surface = await screen.findByTestId(route.states.error)
-      expect(surface).toBeTruthy()
-      // The manifest contract: the error surface CONTAINS the retry affordance,
-      // and the retry actually re-runs the query (swap the network to empty
-      // first, so recovery is observable).
-      uninstallMockServer()
-      installFor('empty')
-      fireEvent.press(screen.getByRole('button', { name: en['common.retry'] }))
-      expect(await screen.findByTestId(route.states.empty)).toBeTruthy()
-    })
-  },
-)
+  it(`a 500 envelope renders ${route.states.error} CONTAINING a retry that recovers`, async () => {
+    installFor('error')
+    renderRouter('./app', { initialUrl: route.path })
+    const surface = await screen.findByTestId(route.states.error)
+    expect(surface).toBeTruthy()
+    // The manifest contract: the error surface CONTAINS the retry affordance,
+    // and the retry actually re-runs the query (swap the network to empty
+    // first, so recovery is observable).
+    uninstallMockServer()
+    installFor('empty')
+    fireEvent.press(screen.getByRole('button', { name: en['common.retry'] }))
+    expect(await screen.findByTestId(route.states.empty)).toBeTruthy()
+  })
+})
 
 describe('route actions canonical states', () => {
   it(`a no-match query renders ${ACTIONS.states.empty} (loading/error are honestly unreachable)`, async () => {

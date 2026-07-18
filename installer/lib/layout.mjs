@@ -62,7 +62,6 @@ export const SEEDED_FILES = new Set([
   'package.json',
   'pnpm-workspace.yaml',
   'docker-compose.yml',
-  'tools/aliveness-manifest.mjs',
   'tools/rls-exempt.json',
   'tools/provenance-overrides.json', // reviewed cross-group cites — consumer-owned like rls-exempt
   'tools/license-exceptions.json',

@@ -15,7 +15,7 @@
 // PLACEHOLDERS are `{name}`. Numbers interpolated through them are formatted with
 // Intl.NumberFormat, so a thousands separator is the locale's, not a hardcoded comma.
 // SOURCE: Unicode CLDR plural rules — the categories Intl.PluralRules selects between
-// https://cldr.unicode.org/index/cldr-spec/plural-rules
+// https://cldr.unicode.org/index/cldr-spec/plural-rules [corpus: unicode/cldr-plurals]
 
 /** A plural set. `other` is required — it is the fallback for every category a locale lacks. */
 interface PluralMessage {

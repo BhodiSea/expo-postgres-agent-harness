@@ -38,6 +38,7 @@ declare const process: {
   }
 }
 
+/** @public — seam API: the shape entraConfig() answers with (test-asserted). */
 export interface EntraConfig {
   readonly tenantId: string
   readonly clientId: string
@@ -47,6 +48,7 @@ export interface EntraConfig {
  * The configured IDs, or null when either is absent. Empty means unset (the
  * `||` discipline from api-client: a bare `EXPO_PUBLIC_ENTRA_TENANT_ID=` line
  * in .env must read as "not configured", never as an empty tenant).
+ * @public — test-facing seam API: the PKCE unit suite drives these pure helpers offline.
  */
 export function entraConfig(): EntraConfig | null {
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- '' must fall through to unset, same as api-client's origin read
@@ -66,6 +68,7 @@ export function entraConfigured(): boolean {
  * The v2.0 endpoints for a tenant. Manual rather than discovered: the shapes
  * are a published contract (SOURCE above), discovery would add a network
  * round-trip before every sign-in, and a pure function is testable offline.
+ * @public — test-facing seam API (see entraConfig).
  */
 export function entraDiscovery(tenantId: string): {
   readonly authorizationEndpoint: string
@@ -88,6 +91,7 @@ export function entraDiscovery(tenantId: string): {
  * is what makes Entra return a refresh_token at all.
  * SOURCE: /.default requests the registration's configured permission set
  * https://learn.microsoft.com/en-us/entra/identity-platform/scopes-oidc
+ * @public — test-facing seam API (see entraConfig).
  */
 export function entraScopes(clientId: string): readonly string[] {
   return ['openid', 'profile', 'offline_access', `api://${clientId}/.default`]
@@ -98,6 +102,7 @@ export function entraScopes(clientId: string): readonly string[] {
  * (app.config.ts `scheme`, locked by the expo-policy gate), which the OS routes
  * back into this app. Reading it from expoConfig keeps the URI derived, never a
  * second hand-typed copy that can drift from the registered one.
+ * @public — test-facing seam API (see entraConfig).
  */
 export function entraRedirectUri(): string {
   const raw = Constants.expoConfig?.scheme

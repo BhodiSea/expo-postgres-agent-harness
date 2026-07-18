@@ -15,6 +15,7 @@ import { Button } from '../src/components/Button'
 import { EmptyState } from '../src/components/EmptyState'
 import { Field } from '../src/components/Field'
 import { Input } from '../src/components/Input'
+import { OptionRow } from '../src/components/OptionRow'
 import { ToastProvider, useToast } from '../src/components/Toast'
 import { MatrixList } from '../src/features/matrix/MatrixList'
 import { MATRIX_COLUMNS, makeSyntheticRows } from '../src/features/matrix/matrixData'
@@ -40,10 +41,29 @@ describe('Button', () => {
   })
 })
 
+describe('OptionRow', () => {
+  it('exposes role=button with its label as the accessible name', () => {
+    render(<OptionRow label="Go to matrix" onPress={jest.fn()} />)
+    expect(screen.getByRole('button', { name: 'Go to matrix' })).toBeTruthy()
+  })
+
+  it('the testID rides the interactive leaf: pressing by testID fires the handler', () => {
+    const onPress = jest.fn()
+    render(<OptionRow label="Run it" onPress={onPress} testID="action-run.it" />)
+    const row = screen.getByTestId('action-run.it')
+    // testID and accessible name share ONE element (the Pressable leaf) — the
+    // actions modal's tests read the label off the testID-found element.
+    expect(row.props['accessibilityLabel'] as string).toBe('Run it')
+    fireEvent.press(row)
+    expect(onPress).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('Field + Input', () => {
   it('labels its control: the input is reachable by the label text', () => {
     render(
       <Field label="Title">
+        {/* eslint-disable-next-line react-native-a11y/has-accessibility-hint -- the no-error state under test: Field wires the hint ONLY when an error exists, and this fixture asserts that absence */}
         {(control) => <Input accessibilityLabel={control.accessibilityLabel} />}
       </Field>,
     )
@@ -69,6 +89,7 @@ describe('Field + Input', () => {
   it('no error, no alert — the channel stays quiet until it has meaning', () => {
     render(
       <Field label="Title">
+        {/* eslint-disable-next-line react-native-a11y/has-accessibility-hint -- the no-error state under test: Field wires the hint ONLY when an error exists, and this fixture asserts that absence */}
         {(control) => <Input accessibilityLabel={control.accessibilityLabel} />}
       </Field>,
     )
@@ -79,7 +100,11 @@ describe('Field + Input', () => {
 describe('EmptyState', () => {
   it('its CTA renders through the Button primitive: role + accessible name', () => {
     render(
-      <EmptyState title="Nothing" description="Yet" cta={{ label: 'Create', onPress: jest.fn() }} />,
+      <EmptyState
+        title="Nothing"
+        description="Yet"
+        cta={{ label: 'Create', onPress: jest.fn() }}
+      />,
     )
     expect(screen.getByRole('button', { name: 'Create' })).toBeTruthy()
   })

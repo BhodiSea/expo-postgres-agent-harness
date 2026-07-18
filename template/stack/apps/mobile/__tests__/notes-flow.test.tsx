@@ -15,16 +15,18 @@ import {
 jest.mock('../src/host', () => {
   let token: string | null = 'jest-session-token'
   return {
-    secureGetToken: jest.fn(async () => token),
-    secureSetToken: jest.fn(async (next: string) => {
+    secureGetToken: jest.fn(() => Promise.resolve(token)),
+    secureSetToken: jest.fn((next: string) => {
       token = next
+      return Promise.resolve()
     }),
-    secureDeleteToken: jest.fn(async () => {
+    secureDeleteToken: jest.fn(() => {
       token = null
+      return Promise.resolve()
     }),
-    secureGetRefreshToken: jest.fn(async () => null),
-    secureSetRefreshToken: jest.fn(async () => undefined),
-    secureDeleteRefreshToken: jest.fn(async () => undefined),
+    secureGetRefreshToken: jest.fn(() => Promise.resolve(null)),
+    secureSetRefreshToken: jest.fn(() => Promise.resolve()),
+    secureDeleteRefreshToken: jest.fn(() => Promise.resolve()),
   }
 })
 

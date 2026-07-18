@@ -106,7 +106,9 @@ describe('useCreateNote', () => {
     installMockServer({
       'POST /api/notes': () => {
         posts += 1
-        return posts === 1 ? { status: 201, body: SERVER_NOTE } : held.handler({ url: '', body: null })
+        return posts === 1
+          ? { status: 201, body: SERVER_NOTE }
+          : held.handler({ url: '', body: null })
       },
     })
     const { result } = renderHook(() => useCreateNote(jest.fn()))
@@ -148,7 +150,9 @@ describe('useCreateNote', () => {
           : { status: 500, body: { error: { code: 'internal', message: 'note storage exploded' } } }
       },
     })
-    const onFailure = jest.fn()
+    // Typed mock: the toast inspection below reads mock.calls, and an untyped
+    // jest.fn() would make that an any-chain the type-aware lint rejects.
+    const onFailure = jest.fn<undefined, [string]>()
     const { result } = renderHook(() => useCreateNote(onFailure))
 
     await act(async () => {
@@ -166,7 +170,7 @@ describe('useCreateNote', () => {
     // The toast says what the envelope's `code` means, in the user's language. The server's own
     // English message ("note storage exploded") is a diagnostic for the logs and must NOT be the
     // sentence a user is asked to read.
-    const toasted = onFailure.mock.calls[0]?.[0] as string
+    const toasted: string = onFailure.mock.calls[0]?.[0] ?? ''
     expect(toasted).toContain(en['error.api.internal'])
     expect(toasted).not.toContain('note storage exploded')
   })

@@ -38,11 +38,11 @@ declare const process: { readonly env: { readonly EXPO_PUBLIC_API_ORIGIN?: strin
 // the failures read as a server fault. The same nullish-vs-empty confusion once
 // disabled audience validation outright in apps/server/src/auth/verify.ts. Empty
 // means unset.
-const configOrigin: unknown = (Constants.expoConfig?.extra as Record<string, unknown> | undefined)?.[
-  'apiOrigin'
-]
-// eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- here `??` IS the bug, not the fix: it passes '' through as the origin. The rule is right in general and wrong here.
+const configOrigin: unknown = (
+  Constants.expoConfig?.extra as Record<string, unknown> | undefined
+)?.['apiOrigin']
 const API_ORIGIN: string =
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- here `??` IS the bug, not the fix: it passes '' through as the origin. The rule is right in general and wrong here.
   process.env.EXPO_PUBLIC_API_ORIGIN || (typeof configOrigin === 'string' ? configOrigin : '')
 
 /** Resolves the bearer token, or null when the session is unauthenticated. */

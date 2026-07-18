@@ -47,8 +47,7 @@ function toResponse(result: MockResponse): Response {
 }
 
 function requestKey(input: RequestInfo | URL, init?: RequestInit): { key: string; url: string } {
-  const url =
-    typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
   const method = (
     init?.method ?? (typeof input === 'object' && 'method' in input ? input.method : 'GET')
   ).toUpperCase()
@@ -66,7 +65,7 @@ export function installMockServer(handlers: Readonly<Record<string, MockRouteHan
   installed = true
   originalFetch = globalThis.fetch
   routes = new Map(Object.entries(handlers))
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const { key, url } = requestKey(input, init)
     const handler = routes?.get(key)
     if (handler === undefined) {
@@ -74,13 +73,16 @@ export function installMockServer(handlers: Readonly<Record<string, MockRouteHan
     }
     const body = typeof init?.body === 'string' ? init.body : null
     return toResponse(await handler({ url, body }))
-  }) as typeof globalThis.fetch
+  }
 }
 
 export function uninstallMockServer(): void {
   if (installed) {
-    // Restore exactly what was there — including "nothing".
-    globalThis.fetch = originalFetch as typeof globalThis.fetch
+    // Restore exactly what was there — including "nothing": jest environments
+    // without a global fetch get their absence back, so the write goes through a
+    // fetch-optional view of globalThis instead of a non-null assertion.
+    const host = globalThis as { fetch?: typeof globalThis.fetch | undefined }
+    host.fetch = originalFetch
     originalFetch = undefined
     installed = false
   }

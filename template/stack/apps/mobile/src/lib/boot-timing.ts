@@ -35,7 +35,7 @@ export function stampBootTiming(): void {
   }
 }
 
-/** The stamped cold-start milliseconds, or null when never measured. */
+/** The stamped cold-start milliseconds, or null when never measured. @public — the perf lane reads it. */
 export function bootTimingMs(): number | null {
   return bootMs
 }

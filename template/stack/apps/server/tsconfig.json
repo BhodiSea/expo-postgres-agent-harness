@@ -12,8 +12,5 @@
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
   },
   "include": ["src", "scripts"],
-  "references": [
-    { "path": "../../packages/contracts" },
-    { "path": "../../packages/schema" }
-  ]
+  "references": [{ "path": "../../packages/contracts" }, { "path": "../../packages/schema" }]
 }

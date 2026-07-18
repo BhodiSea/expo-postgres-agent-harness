@@ -17,9 +17,9 @@ import { SignJWT } from 'jose'
 import { z } from 'zod'
 import { STUB_AUDIENCE, STUB_ISSUER } from './verify.js'
 
-/** The seeded demo user the CLI minter signs for (matches tests/rls USER_A). */
+/** The seeded demo user the CLI minter signs for (matches tests/rls USER_A). @public — script/test seam. */
 export const DEV_USER_ID = '11111111-1111-4111-8111-111111111111'
-/** One working day; re-mint to refresh. */
+/** One working day; re-mint to refresh. @public — script/test seam. */
 export const DEV_TOKEN_TTL_SECONDS = 8 * 60 * 60
 
 // Rotating window: every signer (a CLI run, a server boot that mints) adds ONE
@@ -65,8 +65,9 @@ export function createDevSigner(jwksPath: string): DevSigner {
   const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' })
   const kid = randomUUID()
   const publicJwk = publicKey.export({ format: 'jwk' })
-  const keys = [...existingKeys(jwksPath), { ...publicJwk, kid, alg: 'ES256', use: 'sig' }]
-    .slice(-MAX_JWKS_KEYS)
+  const keys = [...existingKeys(jwksPath), { ...publicJwk, kid, alg: 'ES256', use: 'sig' }].slice(
+    -MAX_JWKS_KEYS,
+  )
   mkdirSync(dirname(jwksPath), { recursive: true })
   writeFileSync(jwksPath, `${JSON.stringify({ keys }, null, 2)}\n`)
 

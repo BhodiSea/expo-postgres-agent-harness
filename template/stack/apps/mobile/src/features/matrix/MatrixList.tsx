@@ -23,6 +23,7 @@ import type { MatrixColumn, MatrixRow } from './matrixData'
 
 // Row height in dp — getItemLayout's contract with the styles below. A drifted
 // pair would make FlatList scroll to the wrong offsets, so it is ONE constant.
+/** @public — seam API: the layout constant device tests measure against. */
 export const MATRIX_ROW_HEIGHT = 36
 
 // FlatList tuning: ~7 viewports of rows kept warm (the default 21 is tuned for
@@ -121,6 +122,7 @@ export function MatrixList({ rows, columns, onEndReached }: MatrixListProps) {
         // visible text; AT reads the row by its label instead of six naked
         // numbers. The row View is styled (height/border), so Fabric keeps it
         // and its testID intact (design record: CI-LANE-FACTS).
+        // eslint-disable-next-line react-native-a11y/has-accessibility-hint -- a static readout row: the label IS the whole content, and there is no interaction outcome for a hint to describe
         <View
           style={styles.row}
           accessible

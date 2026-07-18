@@ -18,8 +18,8 @@ import { renderHook, waitFor } from '@testing-library/react-native'
 import { act } from 'react'
 import { createStubProvider } from '../src/auth/providers/stub'
 import { installSessionProvider, sessionProvider } from '../src/auth/session'
-import { useCreateNote } from '../src/features/notes/useCreateNote'
 import { useKeysetQuery } from '../src/features/matrix/useKeysetQuery'
+import { useCreateNote } from '../src/features/notes/useCreateNote'
 import { apiFetch } from '../src/lib/api-client'
 import { type SseEvent, streamApiSse } from '../src/lib/sse'
 
@@ -28,16 +28,18 @@ import { type SseEvent, streamApiSse } from '../src/lib/sse'
 jest.mock('../src/host', () => {
   let token: string | null = null
   return {
-    secureGetToken: jest.fn(async () => token),
-    secureSetToken: jest.fn(async (next: string) => {
+    secureGetToken: jest.fn(() => Promise.resolve(token)),
+    secureSetToken: jest.fn((next: string) => {
       token = next
+      return Promise.resolve()
     }),
-    secureDeleteToken: jest.fn(async () => {
+    secureDeleteToken: jest.fn(() => {
       token = null
+      return Promise.resolve()
     }),
-    secureGetRefreshToken: jest.fn(async () => null),
-    secureSetRefreshToken: jest.fn(async () => undefined),
-    secureDeleteRefreshToken: jest.fn(async () => undefined),
+    secureGetRefreshToken: jest.fn(() => Promise.resolve(null)),
+    secureSetRefreshToken: jest.fn(() => Promise.resolve()),
+    secureDeleteRefreshToken: jest.fn(() => Promise.resolve()),
   }
 })
 
@@ -58,35 +60,31 @@ function nodeFetch(url: string, init: RequestInit = {}): Promise<Response> {
     headers[key] = value
   })
   return new Promise((resolve, reject) => {
-    const request = http.request(
-      url,
-      { method: init.method ?? 'GET', headers },
-      (incoming) => {
-        const status = incoming.statusCode ?? 0
-        const body = Readable.toWeb(incoming) as unknown as ReadableStream<Uint8Array>
-        const chunks: Buffer[] = []
-        let buffered: Promise<string> | null = null
-        const text = (): Promise<string> => {
-          buffered ??= (async () => {
-            const reader = body.getReader()
-            for (;;) {
-              const { done, value } = await reader.read()
-              if (done) break
-              chunks.push(Buffer.from(value))
-            }
-            return Buffer.concat(chunks).toString('utf8')
-          })()
-          return buffered
-        }
-        resolve({
-          ok: status >= 200 && status < 300,
-          status,
-          body,
-          text,
-          json: async () => JSON.parse(await text()) as unknown,
-        } as unknown as Response)
-      },
-    )
+    const request = http.request(url, { method: init.method ?? 'GET', headers }, (incoming) => {
+      const status = incoming.statusCode ?? 0
+      const body = Readable.toWeb(incoming) as unknown as ReadableStream<Uint8Array>
+      const chunks: Buffer[] = []
+      let buffered: Promise<string> | null = null
+      const text = (): Promise<string> => {
+        buffered ??= (async () => {
+          const reader = body.getReader()
+          for (;;) {
+            const { done, value } = await reader.read()
+            if (done) break
+            chunks.push(Buffer.from(value))
+          }
+          return Buffer.concat(chunks).toString('utf8')
+        })()
+        return buffered
+      }
+      resolve({
+        ok: status >= 200 && status < 300,
+        status,
+        body,
+        text,
+        json: async () => JSON.parse(await text()) as unknown,
+      } as unknown as Response)
+    })
     request.on('error', reject)
     if (typeof init.body === 'string') request.write(init.body)
     request.end()
@@ -159,7 +157,7 @@ describeLive('live API proof (real server, real Postgres, FORCE RLS)', () => {
     // 4 — delete through the one door; 204 has no body.
     const del = await apiFetch(`/api/notes/${created.id}`, { method: 'DELETE' })
     expect(del.status).toBe(204)
-    await act(() => {
+    act(() => {
       list.result.current.reload()
     })
     await waitFor(() => {

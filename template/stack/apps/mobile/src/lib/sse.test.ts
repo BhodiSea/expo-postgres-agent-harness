@@ -152,7 +152,9 @@ describe('feedSse — line endings and chunk boundaries', () => {
   it('one character per chunk parses identically to one big chunk', () => {
     const stream = 'event: tick\r\ndata: 1\r\nid: 1\r\n\r\nevent: tick\r\ndata: 2\r\nid: 2\r\n\r\n'
     const whole = collect([stream]).events
-    const trickled = collect([...stream]).events
+    // Array.from (not spread): same code-point split, without tripping the
+    // no-misused-spread emoji hazard — this fixture is pure ASCII either way.
+    const trickled = collect(Array.from(stream)).events
     expect(trickled).toEqual(whole)
     expect(whole).toEqual([
       { event: 'tick', data: '1', id: '1' },

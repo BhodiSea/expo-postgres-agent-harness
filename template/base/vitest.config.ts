@@ -52,7 +52,24 @@ export default defineConfig({
   test: {
     coverage: {
       provider: 'v8',
-      include: ['apps/*/src/**', 'packages/*/src/**'],
+      // The measured surface is the surface THIS runner tests: the server, the
+      // packages, and the PURE mobile modules (LOCKSTEP with the unit-node
+      // include list below — same runner split, same file set). The rest of
+      // apps/mobile is jest-expo's coverage surface (its own collectCoverageFrom
+      // + coverageThreshold); counting those files here as 0% would make this
+      // aggregate a lie in both directions, and the diff-coverage gate already
+      // merges both maps into the one per-file floor.
+      include: [
+        'apps/server/src/**',
+        'packages/*/src/**',
+        'apps/mobile/src/i18n/**',
+        'apps/mobile/src/routes.ts',
+        'apps/mobile/src/lib/kv.ts',
+        'apps/mobile/src/lib/sse.ts',
+        'apps/mobile/src/features/actions/fuzzyScore.ts',
+        'apps/mobile/src/features/actions/recents.ts',
+        'apps/mobile/src/features/matrix/matrixData.ts',
+      ],
       exclude: COVERAGE_EXCLUDE,
       // The vitest defaults, pinned explicitly because a sibling gate depends on
       // one of them: `json` writes coverage/coverage-final.json, the artifact

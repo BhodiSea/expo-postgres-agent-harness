@@ -1,9 +1,8 @@
 # Hygiene gate: no project-specific strings, credential shapes, or sibling-stack
 # leftovers may leak into template/, and the placeholder registry must be closed
 # over the template tree. Blocks every PR and release.
-# PORT NOTE: scripts/check-claims.mjs (quantitative-claims consistency) returns
-# with the gate chain, and the nightly corpus-fidelity job returns with the
-# corpus (see design/PORT-SPEC.md workstreams).
+# PORT NOTE: the nightly corpus-fidelity job returns with the corpus (see
+# design/PORT-SPEC.md workstreams).
 name: hygiene
 
 on:
@@ -34,3 +33,8 @@ jobs:
         with:
           node-version: 22
       - run: node scripts/hygiene.mjs
+      # G12: the harness's own quantitative claims must be TRUE and mutually consistent.
+      # The source harness's v0.1.5 shipped a README claiming cold ≈70 s while the
+      # CHANGELOG claimed ≈85 s for the same release — "prove, don't claim" has to
+      # apply to the harness itself.
+      - run: node scripts/check-claims.mjs

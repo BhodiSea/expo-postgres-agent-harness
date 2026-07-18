@@ -23,19 +23,23 @@ jest.mock('../src/host', () => {
   let token: string | null = null
   let refresh: string | null = null
   return {
-    secureGetToken: jest.fn(async () => token),
-    secureSetToken: jest.fn(async (next: string) => {
+    secureGetToken: jest.fn(() => Promise.resolve(token)),
+    secureSetToken: jest.fn((next: string) => {
       token = next
+      return Promise.resolve()
     }),
-    secureDeleteToken: jest.fn(async () => {
+    secureDeleteToken: jest.fn(() => {
       token = null
+      return Promise.resolve()
     }),
-    secureGetRefreshToken: jest.fn(async () => refresh),
-    secureSetRefreshToken: jest.fn(async (next: string) => {
+    secureGetRefreshToken: jest.fn(() => Promise.resolve(refresh)),
+    secureSetRefreshToken: jest.fn((next: string) => {
       refresh = next
+      return Promise.resolve()
     }),
-    secureDeleteRefreshToken: jest.fn(async () => {
+    secureDeleteRefreshToken: jest.fn(() => {
       refresh = null
+      return Promise.resolve()
     }),
   }
 })

@@ -26,7 +26,7 @@ import { apiFetch, type FetchImplementation } from './api-client'
 // SOURCE: WHATWG HTML §9.2 Server-sent events — the event-stream parsing model
 // this file implements (field grammar, BOM, CR/CRLF/LF line endings, comment
 // lines, dispatch-on-blank-line, last-event-id persistence, digits-only retry)
-// https://html.spec.whatwg.org/multipage/server-sent-events.html
+// https://html.spec.whatwg.org/multipage/server-sent-events.html [corpus: whatwg/sse]
 
 /** One dispatched event. `event` defaults to 'message' per spec. */
 export interface SseEvent {
@@ -70,6 +70,7 @@ interface LineEffect {
 }
 
 /** Apply one COMPLETE line (terminator already removed) to the machine. */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- 16/15: mirrors the WHATWG event-stream field dispatch step-for-step; splitting it would detach the code from the spec text it cites
 function applyLine(state: SseParserState, line: string): LineEffect {
   if (line === '') {
     // Blank line: dispatch. An empty data buffer dispatches NOTHING — but still
@@ -124,6 +125,7 @@ function applyLine(state: SseParserState, line: string): LineEffect {
  * chunk COMPLETED. Chunk boundaries are arbitrary — mid-line, mid-CRLF, even
  * mid-BOM handling — which is exactly what the unit suite exercises.
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- 16/15: the chunk-boundary walk (buffer + CR/LF/CRLF + BOM) is one spec-shaped loop; the unit suite pins every branch
 export function feedSse(
   state: SseParserState,
   chunk: string,
@@ -197,7 +199,7 @@ export interface StreamSseOptions {
 async function expoStreamingFetch(): Promise<FetchImplementation> {
   // Dynamic on purpose; see StreamSseOptions.fetchImpl.
   const mod = await import('expo/fetch')
-  return mod.fetch as unknown as FetchImplementation
+  return mod.fetch
 }
 
 /**

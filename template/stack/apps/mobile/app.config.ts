@@ -5,7 +5,7 @@
 // equality (a consumer replacing them with literals goes red on the next
 // bump). eas.json pins appVersionSource: "local" + autoIncrement: false —
 // a remote counter would be a version surface no gate can diff.
-// SOURCE: docs/harness/README.md (version lockstep doctrine)
+// SOURCE: docs/harness/README.md (version lockstep doctrine) [corpus: harness/doctrine]
 import pkg from './package.json'
 
 const [major = 0, minor = 0, patch = 0] = pkg.version.split('.').map(Number)
@@ -53,6 +53,7 @@ export default {
     // OTA compatibility boundary: an update can only reach the exact store
     // version it was exported against. Deterministic and PR-reviewable, unlike
     // the fingerprint policy (a computed hash) — see design record.
+    // SOURCE: EAS Update runtime versions — the appVersion policy [corpus: expo/runtime-versions]
     runtimeVersion: { policy: 'appVersion' },
     extra: {
       // The committed transport target — the expo-policy gate asserts it is

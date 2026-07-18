@@ -36,7 +36,7 @@ const noopSink: LogSink = {
 
 let sink: LogSink = __DEV__ ? devSink : noopSink
 
-/** Install a replacement sink (crash reporting). Dev default: the console. */
+/** Install a replacement sink (crash reporting). Dev default: the console. @public — the crash-reporting module hook. */
 export function setLogSink(next: LogSink): void {
   sink = next
 }

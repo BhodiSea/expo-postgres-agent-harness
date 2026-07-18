@@ -9,12 +9,12 @@ import { renderRouter, screen } from 'expo-router/testing-library'
 import { installMockServer, uninstallMockServer } from '../src/testing/mock-server'
 
 jest.mock('../src/host', () => ({
-  secureGetToken: jest.fn(async () => 'jest-session-token'),
-  secureSetToken: jest.fn(async () => undefined),
-  secureDeleteToken: jest.fn(async () => undefined),
-  secureGetRefreshToken: jest.fn(async () => null),
-  secureSetRefreshToken: jest.fn(async () => undefined),
-  secureDeleteRefreshToken: jest.fn(async () => undefined),
+  secureGetToken: jest.fn(() => Promise.resolve('jest-session-token')),
+  secureSetToken: jest.fn(() => Promise.resolve()),
+  secureDeleteToken: jest.fn(() => Promise.resolve()),
+  secureGetRefreshToken: jest.fn(() => Promise.resolve(null)),
+  secureSetRefreshToken: jest.fn(() => Promise.resolve()),
+  secureDeleteRefreshToken: jest.fn(() => Promise.resolve()),
 }))
 
 beforeEach(() => {

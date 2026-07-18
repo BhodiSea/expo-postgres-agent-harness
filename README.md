@@ -16,12 +16,72 @@ project.
 An npm-installable CLI + Claude Code plugin that scaffolds an Expo + Hono +
 Postgres monorepo and installs three enforcement layers into it:
 
-1. **Agent-time hooks** — a Claude Code `Stop` hook that refuses to end a turn
-   until the validation chain, RLS isolation tests, and unit suites pass.
+1. **Agent-time hooks** — PreToolUse guards driven by a pure-data rule table
+   (72 guard-rule ids: shell-command denials, write-protected harness paths,
+   banned content everywhere), a PostToolUse provenance check, and a Claude
+   Code `Stop` hook that refuses to end a turn until the validation chain,
+   RLS isolation tests, and both unit suites pass.
 2. **Commit-time checks** — lefthook + commitlint + gitleaks.
 3. **CI** — the same validation chain, fail-closed, plus device lanes
    (Android emulator + Maestro) and release automation (release-please +
    EAS Build/Submit with honest degrade when credentials are absent).
+
+## The gate chain
+
+`pnpm validate` in a scaffolded project runs `tools/validate.mjs`, driven by a
+single config (`tools/harness.config.mjs`) shared by the Stop hook and CI so
+the three layers can never disagree about what "done" means. The chain is
+21 gates, cheap → expensive:
+
+format (biome) → gate-integrity (manifest sha over the gate scripts/hooks —
+tampering is turn-fatal) → types (`tsc -b`) → lint (typescript-eslint
+strictTypeChecked + react-native/a11y every-rule-error + React Compiler rules +
+cognitive-complexity ≤ 15 + the fetch/secure-store/chart-library boundary
+bans) → provenance (`SOURCE:` on every decision site) → **expo-policy**
+(identity lock, ATS/cleartext, permissions + config-plugin allowlists, CNG
+purity, secret-shaped `extra` ban, splash-color lockstep, eas.json sanity) →
+**native-deps** (`expo install --check`, CNG purity, plugin allowlist) →
+version-sync → prompts (hash-locked LLM prompts) → licenses → **schema-rls**
+(every `pgTable` FORCE RLS + per-operation policies, or a reviewed exemption) →
+migrations (append-only, DML-free) → contracts → dead-code (`knip --strict`) →
+architecture (dependency-cruiser: mobile never imports server code or the
+server stack, driver confined to the db layer, `db/context` DAL-only) → build →
+styleguide (OKLCH token manifest regen-diff) → perf-budget → route-manifest →
+e2e (the jest-expo + RNTL fast lane) → docs-sync.
+
+CI runs the same chain against the frozen snapshot `tools/validate.floor.json`
+(`node tools/validate.mjs --min-floor`; write-guard-protected, fail-closed if
+missing, kept in lockstep with the config by `scripts/generate-floor.mjs`) — a
+locally-weakened config cannot weaken CI. Toolchain-dependent gates skip
+loudly without their prerequisite locally and fail closed in CI
+(`HARNESS_REQUIRE_TOOLCHAINS=1`); a skip is never mistakable for a pass.
+**Honest limit:** the chain contains no on-device proof — Maestro device flows
+and startup-budget measurement run in CI device lanes, not at agent time.
+
+Before a turn may end, the Stop hook runs the full chain (`--report-all`, so
+every red surfaces at once) and then, invoked directly rather than through a
+redefinable package script: the RLS isolation suite against real Postgres,
+the vitest unit suite and the jest-expo mobile suite (both with coverage),
+then per-file diff-coverage over the merged maps, duplication, the i18n seam,
+test-quality (assertion presence, no committed `.only`), and the mobile-perf
+closure (every route has a Maestro flow and a startup-budget row).
+
+## The harness under its own bar
+
+The repo applies the doctrine to itself: `scripts/` carries the machinery
+self-checks, blocking in this repo's CI. `check-rule-integrity.mjs` hashes the
+shipped depcruise forbidden rules + scan options and pins the shipped eslint
+config text against `scripts/rule-integrity.json`, so a deleted, narrowed, or
+severity-flipped boundary rule reds even though the lint/architecture runners
+would still exit 0. `check-complexity-ratchet.mjs` re-lints with
+`--no-inline-config` so a ratcheted function cannot grow behind its disable
+directive. `check-claims.mjs` recomputes the machine-derivable numbers in this
+README (chain length, guard-rule ids) and asserts README/CHANGELOG timing
+figures cannot contradict each other. `check-release-lockstep.mjs` asserts one
+version everywhere (package.json, plugin manifest, hook stamps, CITATION.cff,
+CHANGELOG). `generate-floor.mjs` keeps the CI floor snapshot equal to the
+canonical chain. Wall-clock timings are deliberately absent here: none have
+been measured on this port yet, and unmeasured numbers do not ship.
 
 ## Install
 

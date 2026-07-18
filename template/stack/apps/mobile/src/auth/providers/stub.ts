@@ -4,8 +4,9 @@
 // mode is stub (apps/server/src/auth/dev-token.ts): `{ sub? }` -> 201
 // `{ token, userId }`. The minted JWT lands in the platform keychain via
 // src/host and is replayed per request by the api-client one-door.
-import { apiPost } from '../../lib/api-client'
+
 import { secureDeleteToken, secureGetToken, secureSetToken } from '../../host'
+import { apiPost } from '../../lib/api-client'
 import type { AccessTokenProvider } from '../session'
 
 interface DevTokenResponse {

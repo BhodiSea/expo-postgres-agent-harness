@@ -1,23 +1,24 @@
 import { router } from 'expo-router'
 import { useState } from 'react'
-import { Pressable, ScrollView, View } from 'react-native'
+import { ScrollView, View } from 'react-native'
 import { sessionProvider } from '../src/auth/session'
 import { AppText } from '../src/components/AppText'
 import { EmptyState } from '../src/components/EmptyState'
 import { Input } from '../src/components/Input'
+import { OptionRow } from '../src/components/OptionRow'
 import { Screen } from '../src/components/Screen'
+import { rankCommands } from '../src/features/actions/fuzzyScore'
+import { pushRecent, readRecents } from '../src/features/actions/recents'
 import {
-  type ActionCommand,
   ACTION_COMMANDS,
+  type ActionCommand,
   type ActionContext,
   type ActionGroup,
 } from '../src/features/actions/registry'
-import { rankCommands } from '../src/features/actions/fuzzyScore'
-import { pushRecent, readRecents } from '../src/features/actions/recents'
 import { type MessageKey, useI18n } from '../src/i18n'
 import { ROUTES } from '../src/routes'
-import { type Palette, useThemedStyles } from '../src/theme/theme'
-import { radius, spacing } from '../src/theme/tokens.gen'
+import { useThemedStyles } from '../src/theme/theme'
+import { spacing } from '../src/theme/tokens.gen'
 
 // The actions modal (presented by app/_layout.tsx) — the mobile successor of
 // the desktop command palette: a search input over the typed registry, ranked
@@ -97,20 +98,11 @@ function buildSections(
   return [{ id: RECENTS_SECTION, commands: recents }, ...grouped]
 }
 
-const actionStyles = (palette: Palette) => ({
+// A palette-less factory: the surviving styles are pure spacing — the row
+// paint left with the control it dressed, into the OptionRow primitive.
+const actionStyles = () => ({
   list: {
     gap: spacing,
-  },
-  option: {
-    backgroundColor: palette.canvas,
-    borderColor: palette.edge,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    paddingHorizontal: spacing * 3,
-    paddingVertical: spacing * 2,
-  },
-  optionPressed: {
-    opacity: 0.7,
   },
   sectionHeader: {
     paddingTop: spacing * 2,
@@ -157,6 +149,7 @@ export default function ActionsModal() {
   return (
     <Screen testID="actions-screen">
       <AppText variant="title">{t('route.actions')}</AppText>
+      {/* eslint-disable-next-line react-native-a11y/has-accessibility-hint -- the label + placeholder already say everything a hint would; a third repetition is screen-reader noise */}
       <Input
         value={query}
         onChangeText={setQuery}
@@ -183,18 +176,16 @@ export default function ActionsModal() {
                 {t(groupLabelKey(section.id))}
               </AppText>
               {section.commands.map((command) => (
-                <Pressable
+                // Rows render through the OptionRow primitive: the pressable
+                // styling, role/label contract, and leaf testID live there.
+                <OptionRow
                   key={`${section.id}:${command.id}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={command.title}
+                  label={command.title}
                   testID={`action-${command.id}`}
                   onPress={() => {
                     runCommand(command)
                   }}
-                  style={({ pressed }) => [styles.option, pressed && styles.optionPressed]}
-                >
-                  <AppText>{command.title}</AppText>
-                </Pressable>
+                />
               ))}
             </View>
           ))}

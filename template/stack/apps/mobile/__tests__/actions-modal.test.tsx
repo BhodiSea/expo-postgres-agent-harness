@@ -7,7 +7,7 @@ import { fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-li
 import { en } from '../src/i18n/catalog'
 import { installMockServer, uninstallMockServer } from '../src/testing/mock-server'
 
-const { kvBacking } = jest.requireMock('../src/lib/kv') as { kvBacking: Map<string, string> }
+const { kvBacking } = jest.requireMock<{ kvBacking: Map<string, string> }>('../src/lib/kv')
 
 jest.mock('../src/lib/kv', () => {
   const kvBacking = new Map<string, string>()
@@ -24,15 +24,22 @@ jest.mock('../src/lib/kv', () => {
 })
 
 jest.mock('../src/host', () => ({
-  secureGetToken: jest.fn(async () => 'jest-session-token'),
-  secureSetToken: jest.fn(async () => undefined),
-  secureDeleteToken: jest.fn(async () => undefined),
-  secureGetRefreshToken: jest.fn(async () => null),
-  secureSetRefreshToken: jest.fn(async () => undefined),
-  secureDeleteRefreshToken: jest.fn(async () => undefined),
+  secureGetToken: jest.fn(() => Promise.resolve('jest-session-token')),
+  secureSetToken: jest.fn(() => Promise.resolve()),
+  secureDeleteToken: jest.fn(() => Promise.resolve()),
+  secureGetRefreshToken: jest.fn(() => Promise.resolve(null)),
+  secureSetRefreshToken: jest.fn(() => Promise.resolve()),
+  secureDeleteRefreshToken: jest.fn(() => Promise.resolve()),
 }))
 
 const RECENTS_KEY = 'actions.recents'
+
+/** Press the first element carrying the testID (guarded: noUncheckedIndexedAccess types [0] undefined). */
+async function pressFirst(testId: string): Promise<void> {
+  const [first] = await screen.findAllByTestId(testId)
+  if (first === undefined) throw new Error(`no element with testID ${testId}`)
+  fireEvent.press(first)
+}
 
 const emptyPage = () => ({ status: 200, body: { items: [], nextCursor: null } })
 const HEALTH = () => ({ status: 200, body: { ok: true as const, version: '0.0.0' } })
@@ -138,7 +145,7 @@ describe('actions modal recents', () => {
     installAppNetwork()
     renderRouter('./app', { initialUrl: '/actions' })
 
-    fireEvent.press((await screen.findAllByTestId('action-nav.matrix'))[0]!)
+    await pressFirst('action-nav.matrix')
 
     await waitFor(() => {
       expect(JSON.parse(kvBacking.get(RECENTS_KEY) ?? 'null')).toEqual(['nav.matrix', 'nav.home'])
@@ -160,7 +167,7 @@ describe('actions modal commands', () => {
     installAppNetwork()
     renderRouter('./app', { initialUrl: '/actions' })
 
-    fireEvent.press((await screen.findAllByTestId('action-nav.matrix'))[0]!)
+    await pressFirst('action-nav.matrix')
 
     expect(await screen.findByTestId('matrix-screen')).toBeTruthy()
   })
@@ -169,7 +176,7 @@ describe('actions modal commands', () => {
     installAppNetwork()
     renderRouter('./app', { initialUrl: '/actions' })
 
-    fireEvent.press((await screen.findAllByTestId('action-notes.create'))[0]!)
+    await pressFirst('action-notes.create')
 
     const input = await screen.findByTestId('note-composer-input')
     // The ?focus=composer param forwards as the input's autoFocus.
@@ -180,7 +187,7 @@ describe('actions modal commands', () => {
     installAppNetwork()
     renderRouter('./app', { initialUrl: '/actions' })
 
-    fireEvent.press((await screen.findAllByTestId('action-session.signOut'))[0]!)
+    await pressFirst('action-session.signOut')
 
     expect(await screen.findByTestId('sign-in-screen')).toBeTruthy()
   })

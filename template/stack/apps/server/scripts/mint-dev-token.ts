@@ -15,5 +15,7 @@ const signer = createDevSigner(jwksPath)
 const { token } = await signer.mint(DEV_USER_ID)
 
 console.log(`wrote ${jwksPath}`)
-console.log(`dev token for user ${DEV_USER_ID} (expires in ${String(DEV_TOKEN_TTL_SECONDS / 3600)}h):`)
+console.log(
+  `dev token for user ${DEV_USER_ID} (expires in ${String(DEV_TOKEN_TTL_SECONDS / 3600)}h):`,
+)
 console.log(token)

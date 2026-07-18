@@ -88,6 +88,7 @@ function NoteRowItem({ row }: { readonly row: ComposerRow }) {
     // element: pending state is part of the accessible name, so assistive tech
     // hears what sighted users see in the dashed border (leaf-testID discipline,
     // design record: CI-LANE-FACTS).
+    // eslint-disable-next-line react-native-a11y/has-accessibility-hint -- a static note card: the label (title + pending state) IS the whole content; no interaction outcome exists for a hint
     <View
       style={[styles.row, row.pending && styles.rowPending]}
       testID={row.pending ? 'note-row-pending' : 'note-row'}
