@@ -1,0 +1,154 @@
+// Shared layout constants for the installer.
+// Template storage conventions: files that install to dot-paths are stored
+// dotless (npm-packlist strips .gitignore/.npmrc and treats nested .gitignore
+// as pack-ignore manifests; storing .github dotless also prevents template
+// workflows from executing in this repo's own Actions). `.claude/` is the one
+// dotted exception: verified to survive npm pack, and hooks reference it.
+export const RENAMES = new Map([
+  ['gitignore', '.gitignore'],
+  ['github', '.github'],
+  ['gitattributes', '.gitattributes'],
+  ['editorconfig', '.editorconfig'],
+  ['nvmrc', '.nvmrc'],
+  ['node-version', '.node-version'],
+  ['gitleaks.toml', '.gitleaks.toml'],
+  ['dependency-cruiser.cjs', '.dependency-cruiser.cjs'],
+  ['mcp.json', '.mcp.json'],
+  ['env.example', '.env.example'],
+])
+
+// Opt-in modules under template/modules/<name>/ (same storage conventions).
+export const MODULES = [
+  'ci-windows-release',
+  'ci-windows-e2e',
+  'ci-macos',
+  'ci-provenance',
+  'gate-a11y-deep',
+  'crash-reporting',
+  'ops-backup',
+  'eval-live',
+  'observability',
+]
+
+// Modules folded into the default harness by a release (template/migrations.json
+// promotedModules). `enable` refuses these with the promotion story instead of a
+// bare "unknown module".
+export const RETIRED_MODULES = new Map([
+  ['gate-styleguide', 'promoted into the default gate chain in the 0.1.3 release — run `update`; the styleguide gate now ships in tools/ by default'],
+  ['gate-perf-budget', 'promoted into the default gate chain in the 0.1.3 release — run `update`; the perf-budget gate now ships in tools/ by default'],
+  ['mutation', 'promoted into the default install in the 0.1.6 release — run `update`; StrykerJS, the set-based ratchet and the blocking CI lanes now ship by default (the per-PR lane lives in quality-gate.yml, the nightly full run in mutation.yml). Seed the baseline with `pnpm mutation:baseline`'],
+])
+
+export const TIERS = {
+  core: [],
+  standard: ['ci-provenance', 'ci-windows-release'],
+  strict: [...MODULES],
+}
+
+// Installed paths written once and never overwritten by `update` (the project
+// owns them after init). Matched by prefix or exact path.
+export const SEEDED_PREFIXES = [
+  'apps/',
+  'packages/',
+  'drizzle/',
+  'tests/unit/',
+]
+export const SEEDED_FILES = new Set([
+  'AGENTS.md',
+  'CLAUDE.md',
+  'CITATION.cff',
+  'LICENSE',
+  'SECURITY.md',
+  '.env.example',
+  '.gitignore',
+  'package.json',
+  'pnpm-workspace.yaml',
+  'rust-toolchain.toml',
+  'deny.toml',
+  'docker-compose.yml',
+  'tools/aliveness-manifest.mjs',
+  'tools/rls-exempt.json',
+  'tools/provenance-overrides.json', // reviewed cross-group cites — consumer-owned like rls-exempt
+  'tools/license-exceptions.json',
+  'tools/identity.lock.json',
+  'tools/prompts.lock.json',
+  // Human-tuned budget/design data: write-guard-protected against agents, but a
+  // project raises them deliberately — update must plant-when-absent, never clobber.
+  'tools/styleguide.manifest.json',
+  'tools/perf-budget.json',
+  // Wall-clock budgets for the CI-only interaction-latency lane — human-tuned
+  // like perf-budget.json, and seedOnInitOnly (0.1.5): update withholds it so
+  // the lane arms only when a consumer adopts the budget deliberately.
+  'tools/interaction-budget.json',
+  // Ratio caps for the Rust host's criterion benches + the real-binary cold-start ceiling.
+  // seedOnInitOnly (0.1.6): its subjects[] name THIS project's #[tauri::command] surface, so
+  // planting the template's three into a repo with five commands of its own would be planting
+  // a wrong file — `update` withholds it and the floor self-disables with an adoption NOTE.
+  'tools/native-perf-budget.json',
+  'tools/bundle-budget.json',
+  // The gzip-ratchet baseline: a project's committed measurement, regenerated
+  // only by `pnpm perf:baseline` — plant-when-absent, never clobber (and it is
+  // seedOnInitOnly: `update` withholds it from existing installs so the
+  // template scaffold's bytes never ratchet someone else's bundle).
+  'tools/perf-baseline.json',
+  'tools/route-allowlist.json',
+  'tools/dto-bounds-allow.json',
+  'tools/duplication-allow.json',
+  'tools/decision-groups.json',
+  'tools/i18n-allow.json',
+  // The accepted-survivor list for the mutation lane, and the reviewed escapes for the
+  // assertion gate. Both are project-owned JUDGEMENTS ("this mutant is genuinely
+  // equivalent", "this test is deliberately pending") — write-guard-protected against
+  // agents, hashed by gate-integrity, and seedOnInitOnly so `update` never plants one
+  // project's judgements into another's repo.
+  'tools/mutation-baseline.json',
+  'tools/test-quality-allow.json',
+  'tests/rls/db-context.ts',
+  // The DAL query-shape registry the plan probe drives (0.1.6): it names THIS project's
+  // DAL methods, so only the project can write it. seedOnInitOnly — `update` withholds it
+  // and the probe self-disables with an adoption NOTE rather than ambushing an upgrade.
+  'tests/rls/dal-shapes.ts',
+  // e2e exemplars that COUPLE to the seedOnInitOnly i18n surface (0.1.6): they import
+  // src/i18n/catalog and read route.labelKey / en['<key>']. `update` withholds i18n/ and
+  // routes' labelKey field from a pre-i18n consumer, so auto-planting these owned specs
+  // would dangle those imports and red `lint`/`types` on the next validate. Seeded +
+  // seedOnInitOnly, exactly like dal-shapes.ts: planted fresh, withheld on upgrade until
+  // the project adopts i18n (then `update --refresh-seeded e2e/<spec>`). The generic route
+  // sweeps (a11y/matrix/states/…) stay owned — they read only pre-i18n route fields.
+  'e2e/i18n.spec.ts',
+  'e2e/memory.spec.ts',
+  'e2e/mutation.spec.ts',
+])
+
+// The gate config is seeded (projects tune it) but hash-tracked so `doctor`
+// can surface drift. SOURCE: docs/harness/README.md (tamper evidence)
+export const CONFIG_FILES = new Set(['tools/harness.config.mjs'])
+
+// Stack files installed in retrofit mode only when absent (additive seeds).
+// Workspace packages are additive-only: never merged into existing apps.
+export const RETROFIT_ADDITIVE = new Set([
+  'packages/schema/package.json',
+  'packages/importer/package.json',
+  'packages/eval/package.json',
+])
+
+// Existing root configs the installer must never clobber on retrofit: if the
+// project already has one, ours lands alongside as <base>.harness.<ext>.
+// pnpm-workspace.yaml is the exception — it is MERGED (glob union, catalog
+// add-missing/never-downgrade) by merge-workspace-yaml.mjs, not suffixed.
+export const CONFLICTABLE = [
+  { installed: 'eslint.config.mjs', existing: /^eslint\.config\.(js|mjs|cjs|ts|mts)$/ },
+  { installed: 'biome.jsonc', existing: /^biome\.jsonc?$/ },
+  { installed: 'tsconfig.json', existing: /^tsconfig\.json$/ },
+  { installed: 'knip.json', existing: /^knip\.(json|jsonc|ts)$/ },
+  { installed: '.dependency-cruiser.cjs', existing: /^\.dependency-cruiser\.(js|cjs|mjs)$/ },
+  { installed: 'lefthook.yml', existing: /^lefthook\.(yml|yaml)$/ },
+  { installed: 'commitlint.config.mjs', existing: /^commitlint\.config\.(js|mjs|cjs|ts)$/ },
+  { installed: 'vitest.config.ts', existing: /^vitest\.config\.(ts|mts|js|mjs)$/ },
+  { installed: 'playwright.config.ts', existing: /^playwright\.config\.(ts|mts|js|mjs)$/ },
+  { installed: 'cspell.json', existing: /^\.?cspell\.(json|jsonc|yaml|yml)$/ },
+  { installed: '.gitleaks.toml', existing: /^\.gitleaks\.toml$/ },
+  { installed: '.mcp.json', existing: /^\.mcp\.json$/ },
+  { installed: 'deny.toml', existing: /^deny\.toml$/ },
+  { installed: 'rust-toolchain.toml', existing: /^rust-toolchain(\.toml)?$/ },
+]

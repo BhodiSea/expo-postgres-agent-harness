@@ -1,0 +1,52 @@
+{
+  "name": "expo-postgres-agent-harness",
+  "version": "0.1.0",
+  "description": "Deterministic agent harness for Expo (React Native) + Hono + Drizzle/Postgres 16 pnpm monorepos shipped to the App Store and Google Play via EAS: Claude Code hooks, security-invariant lint gates, RLS isolation tests against real Postgres, Expo config/ATS/permissions policy gates, provenance pipeline, and supply-chain-hardened CI — installable into any new or existing project.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BhodiSea/expo-postgres-agent-harness.git"
+  },
+  "bin": {
+    "expo-postgres-agent-harness": "installer/cli.mjs"
+  },
+  "type": "module",
+  "packageManager": "pnpm@11.11.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "installer",
+    "template",
+    "CHANGELOG.md",
+    "REUSE.toml",
+    "LICENSES"
+  ],
+  "scripts": {
+    "bootstrap": "node installer/cli.mjs init --consume",
+    "test": "node --test \"tests/**/*.test.mjs\""
+  },
+  "keywords": [
+    "claude-code",
+    "agent-harness",
+    "expo",
+    "react-native",
+    "eas",
+    "postgres",
+    "rls",
+    "hono",
+    "drizzle",
+    "quality-gates",
+    "provenance",
+    "supply-chain"
+  ],
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@types/node": "26.1.1",
+    "eslint": "9.39.5",
+    "eslint-plugin-sonarjs": "4.1.0",
+    "globals": "17.7.0",
+    "knip": "6.26.0",
+    "typescript": "6.0.3"
+  }
+}

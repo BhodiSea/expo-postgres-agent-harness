@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: >-
+  If you use this harness in research on AI-assisted software engineering,
+  deterministic agent guardrails, or provenance-verified code generation,
+  please cite it as below.
+type: software
+title: expo-postgres-agent-harness
+abstract: >-
+  A deterministic agent harness for Expo (React Native) + Hono + Drizzle /
+  Postgres 16 pnpm monorepos shipped to the Apple App Store and Google Play
+  via EAS Build and Submit: Claude Code hooks that gate turn completion on a
+  green validation chain, security-invariant lint rules and pre-write guards,
+  row-level-security isolation tests against real Postgres, Expo config
+  policy gates (ATS, permissions, plugins, CNG purity), an inline-citation
+  provenance pipeline, and supply-chain-hardened CI.
+authors:
+  - name: Cogvera Labs
+repository-code: 'https://github.com/BhodiSea/expo-postgres-agent-harness'
+license: Apache-2.0
+version: 0.1.0

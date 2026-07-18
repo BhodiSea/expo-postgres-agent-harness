@@ -1,0 +1,69 @@
+# PORT-SPEC — expo-postgres-agent-harness
+
+The design record for porting `tauri-postgres-agent-harness` (the "source
+harness") to Expo (React Native) + EAS. This repo mirrors the source harness's
+architecture: installer CLI + `template/base` machinery + `template/stack`
+reference app + `template/modules` opt-ins, with the same three-layer
+enforcement (Claude Code Stop hook → `pnpm validate` → CI) and the same
+doctrine (frozen floor snapshot, canary red-proofs with gate↔canary lockstep,
+skip-loudly-locally / fail-closed-in-CI, honest degrade when credentials are
+absent).
+
+## Locked decisions
+
+- **Backend unchanged**: Hono + Drizzle + Postgres 16 FORCE RLS. The mobile
+  client is a thin HTTPS client with a JWT — Postgres stays invisible to it.
+- **Client**: Expo + CNG/prebuild (generated native dirs, never committed),
+  Hermes, expo-router. New Architecture on.
+- **E2E**: jest-expo + React Native Testing Library is the fast in-chain lane
+  (seconds, laptop-complete); Maestro is the CI device lane (GH-hosted Android
+  emulator; iOS nightly on macOS). The Stop chain contains no on-device proof —
+  stated honestly in the gates catalog.
+- **Versioning**: `app.config.ts` derives `version`, `ios.buildNumber`, and
+  `android.versionCode` (maj·1e6 + min·1e3 + pat) from `package.json`;
+  `eas.json` pins `appVersionSource: "local"`, `autoIncrement: false`.
+  `runtimeVersion.policy = 'appVersion'`.
+- **Styling**: plain `StyleSheet` + a generated tokens module.
+  `tools/styleguide.manifest.json` stays the OKLCH source of truth;
+  `tools/gen-theme.mjs` emits committed sRGB tokens; the styleguide gate
+  regen-diffs.
+- **Unit runners**: vitest (server, packages, pure mobile logic) + jest-expo
+  (RN components/screens); diff-coverage merges both istanbul maps.
+- **Orchestrator**: GitHub Actions, SHA-pinned + harden-runner. No selftest
+  job touches EAS/Apple/Google credentials.
+
+## Considered and rejected
+
+- `runtimeVersion.policy = 'fingerprint'` — a computed hash is not
+  PR-reviewable; revisit if OTA reach across store versions becomes a product
+  requirement.
+- EAS remote `autoIncrement` / `appVersionSource: "remote"` — moves a version
+  surface into a database no gate can diff; breaks hermetic selftest.
+- NativeWind / Unistyles — a compile layer (or a native styling runtime)
+  between the styleguide manifest and the pixels defeats the tokens-as-data
+  scannability the gate depends on.
+- Maestro-on-EAS for the base e2e lane — requires credentials and puts a cloud
+  build ahead of every e2e signal; consumers can opt in via a module.
+- EAS Workflows as CI orchestrator — cannot be SHA-pinned, no harden-runner or
+  zizmor/actionlint coverage; splits the audit surface.
+- fastlane for store metadata — drags a Ruby toolchain into a two-toolchain
+  repo; EAS Metadata (JSON in repo) covers the iOS half.
+- react-native-sse — XHR-based extra dependency that bypasses the api-client
+  one-door; the SSE client is a hand-rolled pure parser over `expo/fetch`
+  streaming.
+
+## Gate chain (target: 21 floor gates)
+
+format, gate-integrity, types, lint, provenance, expo-policy, native-deps,
+version-sync, prompts, licenses, schema-rls, migrations, contracts, dead-code,
+architecture, build, styleguide, perf-budget, route-manifest, e2e, docs-sync.
+Stop-chain adds: validate --report-all, rls-isolation, unit, mobile-unit,
+diff-coverage, duplication, i18n, test-quality, mobile-perf --closure.
+
+Replacements relative to the source harness: `tauri-policy` → `expo-policy`
+(identity lock, ATS/cleartext, permissions/plugins allowlists, CNG purity,
+secret-shaped `extra` ban, splash-color lockstep, eas.json sanity);
+`rust-fmt`/`rust-check` → `native-deps` (`expo install --check`, CNG purity,
+config-plugin allowlist + tests); `native-perf` → `mobile-perf --closure`
+(route ↔ Maestro flow ↔ startup-budget triangle). Dropped: forced-colors e2e,
+CDP memory spec (superseded by an agent-time jest-expo emitter-count spec).
