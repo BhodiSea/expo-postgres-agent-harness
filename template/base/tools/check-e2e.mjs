@@ -68,6 +68,11 @@ const env = { ...process.env }
 delete env.HARNESS_PERF_LANE
 delete env.HARNESS_INTEGRATION_LANE
 delete env.LIVE_PROOF
+// jest defaults NODE_ENV=test only when UNSET; an ambient 'development' (a CI
+// job hosting the dev server exports it job-wide) flips the suite into the
+// empty-route-tree failure jest.config.js documents. Forced at the gate seam
+// too, so this gate's verdict never depends on config-load order.
+env.NODE_ENV = 'test'
 
 const res = spawnSync('pnpm --filter mobile exec jest --silent', {
   shell: true, // pnpm is a .cmd shim on Windows; jest.config.js decides workers/reporters

@@ -2,6 +2,18 @@
 // (jest-expo preset). PURE mobile modules run under the ROOT vitest config
 // instead; the runner split is documented there (vitest.config.ts unit-node).
 
+// HERMETIC ENV: jest's own CLI defaults NODE_ENV to 'test' only when it is
+// UNSET. An ambient NODE_ENV=development — exported job-wide by a CI job that
+// hosts the dev API server, or by any shell running one — leaks through and
+// flips the babel-preset-expo/expo-router stack into dev behavior, under which
+// renderRouter mounts an EMPTY route tree: 7 suites / 34 tests red, every
+// dump a bare <RNCSafeAreaProvider /> (proven live by selftest's Canary 19,
+// reproduced with NODE_ENV=development alone and nothing else). Config load
+// runs in the jest main process before workers spawn, so this one line makes
+// every caller hermetic — the mobile-unit chain step, the e2e gate, and a bare
+// `pnpm --filter mobile exec jest` alike.
+process.env.NODE_ENV = 'test'
+
 // DIFF-COVERAGE FLOORS — parsed fail-closed by tools/check-diff-coverage.mjs
 // (the Stop chain's diff-coverage step): every CHANGED file this config measures
 // must clear these per-file percentages, read from coverage/coverage-final.json.
