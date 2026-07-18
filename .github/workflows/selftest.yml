@@ -173,9 +173,14 @@ jobs:
             cat canary1.log
             echo '::error::CANARY: expo-policy PASSED an ATS hole + unreviewed permission + secret-shaped extra — the gate cannot fail'; exit 1
           fi
-          grep -q 'NSAllowsArbitraryLoads' canary1.log
-          grep -q 'no reviewed reason' canary1.log
-          grep -q 'secret-shaped key' canary1.log
+          # A bare `grep -q` under set -e swallows all evidence when the gate
+          # reds via the WRONG path — always dump the log before asserting why.
+          for leg in 'NSAllowsArbitraryLoads' 'no reviewed reason' 'secret-shaped key'; do
+            if ! grep -q "$leg" canary1.log; then
+              cat canary1.log
+              echo "::error::CANARY: expo-policy reddened WITHOUT the '$leg' message — wrong failure path (log above)"; exit 1
+            fi
+          done
           git checkout -q -- apps/mobile/app.config.ts
           echo 'canary OK: expo-policy went red on all three legs'
       - name: 'Canary 2: stage the generated android/ dir → native-deps must FAIL (CNG purity)'
@@ -243,7 +248,10 @@ jobs:
             cat canary8.log
             echo '::error::CANARY: styleguide PASSED raw hex + an inline style object — the gate cannot fail'; exit 1
           fi
-          grep -q '#ff0000' canary8.log
+          if ! grep -q '#ff0000' canary8.log; then
+            cat canary8.log
+            echo '::error::CANARY: styleguide reddened WITHOUT naming the raw hex — wrong failure path (log above)'; exit 1
+          fi
           rm apps/mobile/src/oops.tsx
           echo 'canary OK: styleguide went red on both legs'
       - name: 'Canary 9: an orphan app/ route file + an unregistered screen → route-manifest must FAIL'
@@ -287,7 +295,10 @@ jobs:
             cat canary11.log
             echo '::error::CANARY: the e2e gate PASSED a jest run that ran nothing — the anti-vacuity check cannot fail'; exit 1
           fi
-          grep -q 'vacuous' canary11.log
+          if ! grep -q 'vacuous' canary11.log; then
+            cat canary11.log
+            echo '::error::CANARY: the e2e gate reddened WITHOUT the vacuous-pass message — wrong failure path (log above)'; exit 1
+          fi
           git checkout -q -- apps/mobile/jest.config.js
           echo 'canary OK: e2e went red on a vacuous run'
       - name: 'Canary 12: a tiny committed perf-baseline → the build gzip ratchet must FAIL'
@@ -301,7 +312,10 @@ jobs:
             cat canary12.log
             echo '::error::CANARY: build PASSED a bundle far over baseline × ratioCap — the ratchet cannot fail'; exit 1
           fi
-          grep -q 'exceeds the committed ratchet' canary12.log
+          if ! grep -q 'exceeds the committed ratchet' canary12.log; then
+            cat canary12.log
+            echo '::error::CANARY: build reddened WITHOUT the ratchet message — wrong failure path (log above)'; exit 1
+          fi
           git checkout -q -- tools/perf-baseline.json
           echo 'canary OK: the build ratchet went red'
       - name: 'Canary 13: remove a numbered gates-catalog section → docs-sync must FAIL'
