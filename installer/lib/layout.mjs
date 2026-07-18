@@ -19,12 +19,14 @@ export const RENAMES = new Map([
 
 // Opt-in modules under template/modules/<name>/ (same storage conventions).
 export const MODULES = [
-  'ci-windows-release',
-  'ci-windows-e2e',
-  'ci-macos',
+  'ci-mobile-release',
+  'device-e2e',
+  'eas-update',
+  'store-metadata',
   'ci-provenance',
   'gate-a11y-deep',
   'crash-reporting',
+  'push-notifications',
   'ops-backup',
   'eval-live',
   'observability',
@@ -32,16 +34,12 @@ export const MODULES = [
 
 // Modules folded into the default harness by a release (template/migrations.json
 // promotedModules). `enable` refuses these with the promotion story instead of a
-// bare "unknown module".
-export const RETIRED_MODULES = new Map([
-  ['gate-styleguide', 'promoted into the default gate chain in the 0.1.3 release — run `update`; the styleguide gate now ships in tools/ by default'],
-  ['gate-perf-budget', 'promoted into the default gate chain in the 0.1.3 release — run `update`; the perf-budget gate now ships in tools/ by default'],
-  ['mutation', 'promoted into the default install in the 0.1.6 release — run `update`; StrykerJS, the set-based ratchet and the blocking CI lanes now ship by default (the per-PR lane lives in quality-gate.yml, the nightly full run in mutation.yml). Seed the baseline with `pnpm mutation:baseline`'],
-])
+// bare "unknown module". Empty at 0.1.0 — this lineage starts fresh.
+export const RETIRED_MODULES = new Map([])
 
 export const TIERS = {
   core: [],
-  standard: ['ci-provenance', 'ci-windows-release'],
+  standard: ['ci-provenance', 'ci-mobile-release'],
   strict: [...MODULES],
 }
 
@@ -63,8 +61,6 @@ export const SEEDED_FILES = new Set([
   '.gitignore',
   'package.json',
   'pnpm-workspace.yaml',
-  'rust-toolchain.toml',
-  'deny.toml',
   'docker-compose.yml',
   'tools/aliveness-manifest.mjs',
   'tools/rls-exempt.json',
@@ -77,14 +73,15 @@ export const SEEDED_FILES = new Set([
   'tools/styleguide.manifest.json',
   'tools/perf-budget.json',
   // Wall-clock budgets for the CI-only interaction-latency lane — human-tuned
-  // like perf-budget.json, and seedOnInitOnly (0.1.5): update withholds it so
-  // the lane arms only when a consumer adopts the budget deliberately.
+  // like perf-budget.json, and seedOnInitOnly: update withholds it so the lane
+  // arms only when a consumer adopts the budget deliberately.
   'tools/interaction-budget.json',
-  // Ratio caps for the Rust host's criterion benches + the real-binary cold-start ceiling.
-  // seedOnInitOnly (0.1.6): its subjects[] name THIS project's #[tauri::command] surface, so
-  // planting the template's three into a repo with five commands of its own would be planting
-  // a wrong file — `update` withholds it and the floor self-disables with an adoption NOTE.
-  'tools/native-perf-budget.json',
+  // Startup budgets for the device perf lane (cold-start / fully-drawn / per-
+  // screen nav). seedOnInitOnly: its screens[] name THIS project's routes, so
+  // planting the template's rows into a repo with its own routes would be
+  // planting a wrong file — `update` withholds it and the floor self-disables
+  // with an adoption NOTE.
+  'tools/startup-budget.json',
   'tools/bundle-budget.json',
   // The gzip-ratchet baseline: a project's committed measurement, regenerated
   // only by `pnpm perf:baseline` — plant-when-absent, never clobber (and it is
@@ -96,6 +93,11 @@ export const SEEDED_FILES = new Set([
   'tools/duplication-allow.json',
   'tools/decision-groups.json',
   'tools/i18n-allow.json',
+  // Reviewed platform-capability data: every entry carries a reason. The
+  // expo-policy/native-deps gates read them; a project extends them
+  // deliberately — write-guard-protected against agents.
+  'tools/expo-permissions.json',
+  'tools/expo-plugins.json',
   // The accepted-survivor list for the mutation lane, and the reviewed escapes for the
   // assertion gate. Both are project-owned JUDGEMENTS ("this mutant is genuinely
   // equivalent", "this test is deliberately pending") — write-guard-protected against
@@ -104,20 +106,10 @@ export const SEEDED_FILES = new Set([
   'tools/mutation-baseline.json',
   'tools/test-quality-allow.json',
   'tests/rls/db-context.ts',
-  // The DAL query-shape registry the plan probe drives (0.1.6): it names THIS project's
+  // The DAL query-shape registry the plan probe drives: it names THIS project's
   // DAL methods, so only the project can write it. seedOnInitOnly — `update` withholds it
   // and the probe self-disables with an adoption NOTE rather than ambushing an upgrade.
   'tests/rls/dal-shapes.ts',
-  // e2e exemplars that COUPLE to the seedOnInitOnly i18n surface (0.1.6): they import
-  // src/i18n/catalog and read route.labelKey / en['<key>']. `update` withholds i18n/ and
-  // routes' labelKey field from a pre-i18n consumer, so auto-planting these owned specs
-  // would dangle those imports and red `lint`/`types` on the next validate. Seeded +
-  // seedOnInitOnly, exactly like dal-shapes.ts: planted fresh, withheld on upgrade until
-  // the project adopts i18n (then `update --refresh-seeded e2e/<spec>`). The generic route
-  // sweeps (a11y/matrix/states/…) stay owned — they read only pre-i18n route fields.
-  'e2e/i18n.spec.ts',
-  'e2e/memory.spec.ts',
-  'e2e/mutation.spec.ts',
 ])
 
 // The gate config is seeded (projects tune it) but hash-tracked so `doctor`
@@ -127,6 +119,7 @@ export const CONFIG_FILES = new Set(['tools/harness.config.mjs'])
 // Stack files installed in retrofit mode only when absent (additive seeds).
 // Workspace packages are additive-only: never merged into existing apps.
 export const RETROFIT_ADDITIVE = new Set([
+  'packages/contracts/package.json',
   'packages/schema/package.json',
   'packages/importer/package.json',
   'packages/eval/package.json',
@@ -145,10 +138,7 @@ export const CONFLICTABLE = [
   { installed: 'lefthook.yml', existing: /^lefthook\.(yml|yaml)$/ },
   { installed: 'commitlint.config.mjs', existing: /^commitlint\.config\.(js|mjs|cjs|ts)$/ },
   { installed: 'vitest.config.ts', existing: /^vitest\.config\.(ts|mts|js|mjs)$/ },
-  { installed: 'playwright.config.ts', existing: /^playwright\.config\.(ts|mts|js|mjs)$/ },
   { installed: 'cspell.json', existing: /^\.?cspell\.(json|jsonc|yaml|yml)$/ },
   { installed: '.gitleaks.toml', existing: /^\.gitleaks\.toml$/ },
   { installed: '.mcp.json', existing: /^\.mcp\.json$/ },
-  { installed: 'deny.toml', existing: /^deny\.toml$/ },
-  { installed: 'rust-toolchain.toml', existing: /^rust-toolchain(\.toml)?$/ },
 ]

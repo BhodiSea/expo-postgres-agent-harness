@@ -1,5 +1,5 @@
 // Target-directory detection: bootstrap (empty / no package.json) vs
-// retrofit (existing pnpm monorepo with a Tauri desktop app and/or Hono
+// retrofit (existing pnpm monorepo with an Expo mobile app and/or Hono
 // server). Single-root layouts are rejected in v1 — every gate, glob, and
 // boundary rule assumes the pnpm workspace shape (apps/*, packages/*).
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
@@ -23,8 +23,15 @@ export function detect(targetDir) {
   const allDeps = { ...pkg.dependencies, ...pkg.devDependencies }
   if (allDeps.next) {
     throw new Error(
-      'target depends on `next` — this harness is for Tauri 2 + Hono pnpm monorepos. ' +
+      'target depends on `next` — this harness is for Expo (React Native) + Hono pnpm monorepos. ' +
         'For Next.js + Supabase projects use github:BhodiSea/next-supabase-agent-harness instead.',
+    )
+  }
+  if (allDeps['@tauri-apps/api'] || existsSync(join(targetDir, 'apps/desktop/src-tauri'))) {
+    throw new Error(
+      'target is a Tauri desktop project — this harness is for Expo (React Native) + Hono pnpm ' +
+        'monorepos shipped via EAS. For Tauri 2 desktop projects use ' +
+        'github:BhodiSea/tauri-postgres-agent-harness instead.',
     )
   }
   for (const lock of ['package-lock.json', 'yarn.lock', 'bun.lockb', 'bun.lock']) {
@@ -44,17 +51,20 @@ export function detect(targetDir) {
         'fresh scaffold and move your code into it.',
     )
   }
-  const hasTauri = existsSync(join(targetDir, 'apps/desktop/src-tauri/tauri.conf.json'))
+  const hasExpo =
+    Boolean(allDeps.expo) ||
+    existsSync(join(targetDir, 'apps/mobile/app.config.ts')) ||
+    existsSync(join(targetDir, 'apps/mobile/app.json'))
   const hasHono = Boolean(allDeps.hono) || existsSync(join(targetDir, 'apps/server/package.json'))
-  if (!hasTauri && !hasHono) {
+  if (!hasExpo && !hasHono) {
     throw new Error(
-      'workspace found, but neither apps/desktop/src-tauri/tauri.conf.json nor an apps/server ' +
-        'Hono app is present — the harness targets Tauri 2 desktop + Hono server monorepos. ' +
+      'workspace found, but neither an apps/mobile Expo app (app.config.ts) nor an apps/server ' +
+        'Hono app is present — the harness targets Expo mobile + Hono server monorepos. ' +
         'If your workspace uses different app paths, v1 cannot retrofit it; track the ' +
         'configurable-layout fast-follow in the harness repo.',
     )
   }
-  return { mode: 'retrofit', pkg, hasTauri, hasHono }
+  return { mode: 'retrofit', pkg, hasExpo, hasHono }
 }
 
 export function detectContext(targetDir) {

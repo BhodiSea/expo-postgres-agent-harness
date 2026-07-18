@@ -2,7 +2,7 @@
 // appended (dedup on trimmed line) under one marker. The harness needs its
 // ignore lines active (e.g. .dev-auth/, .harness stamps, target/) — a sibling
 // file would be inert, and clobbering a project's ignore rules is destructive.
-const MARKER = '# --- tauri-postgres-agent-harness ---'
+const MARKER = '# --- expo-postgres-agent-harness ---'
 
 export function mergeGitignore(existingText, incomingText) {
   const theirLines = new Set(existingText.split('\n').map((l) => l.trim()))

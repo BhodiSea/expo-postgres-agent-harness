@@ -302,7 +302,7 @@ function refreshSeeded({ targetDir, manifest, entries, answers, paths, opts }) {
     const ip = toPosix(rawPath).replace(/^\.\//, '')
     // A subtree request (trailing '/' or a bare directory) pulls every template
     // entry under it — the channel the seedOnInitOnly note advertises, e.g.
-    // `update --refresh-seeded apps/desktop/src/features/matrix/`. An exact-file
+    // `update --refresh-seeded apps/mobile/src/features/matrix/`. An exact-file
     // request still resolves to a single entry.
     const prefix = ip.endsWith('/') ? ip : `${ip}/`
     const matches = entries.filter((e) => e.installPath === ip || e.installPath.startsWith(prefix))

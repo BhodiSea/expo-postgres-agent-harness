@@ -5,9 +5,10 @@
 // per-environment deployment config and live in .env (see env.example).
 // Baking placeholder GUIDs into committed files invites real IDs into git.
 // Each entry may carry `validate(value) -> string | null` (an error message,
-// or null when acceptable). Invalid answers are rejected up front: a >30-char
-// PRODUCT_IDENTIFIER breaks MSI upgrade identity FOREVER (identity.lock.json
-// pins it), and a malformed API_ORIGIN is baked into the committed CSP.
+// or null when acceptable). Invalid answers are rejected up front: the
+// APP_IDENTIFIER is store identity on BOTH stores (iOS bundleIdentifier and
+// android.package) and immutable after first release (identity.lock.json pins
+// it), and a malformed API_ORIGIN is baked into the committed transport policy.
 export const PLACEHOLDERS = {
   PROJECT_NAME: {
     prompt: 'Human-readable project name (e.g. "Acme Curriculum")',
@@ -24,37 +25,46 @@ export const PLACEHOLDERS = {
     validate: (v) =>
       /^[a-z0-9]+(-[a-z0-9]+)*$/.test(v) ? null : 'must be kebab-case ([a-z0-9-], no leading/trailing dash)',
   },
-  // Windows/Tauri bundle identifier. NSIS + MSI upgrade identity derive from
-  // it; ≤30 chars keeps it inside the MSI UpgradeCode derivation limit and it
-  // must never change after first release (tools/identity.lock.json pins it).
-  PRODUCT_IDENTIFIER: {
-    prompt: 'Reverse-DNS bundle identifier (e.g. com.acme.curriculum, ≤30 chars, immutable after release)',
+  // Store identity for BOTH stores: app.config.ts uses it as ios.bundleIdentifier
+  // AND android.package, so it must satisfy the intersection of both rule sets —
+  // Android forbids hyphens and requires letter-first segments; iOS forbids
+  // underscores. Intersection: segments of [a-z][a-z0-9]*, dot-separated, >= 2
+  // segments. Immutable after first release (tools/identity.lock.json pins it).
+  APP_IDENTIFIER: {
+    prompt: 'Reverse-DNS app identifier (e.g. com.acme.curriculum — iOS bundle id AND Android package, immutable after release)',
     default: (ctx) => {
       const slug = (ctx.answers.PROJECT_SLUG ?? ctx.dirName ?? 'my-project')
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '')
-      return `com.example.${slug}`.slice(0, 30)
+      return `com.example.${slug}`
     },
     validate: (v) => {
-      if (v.length > 30) return `is ${v.length} chars — the MSI UpgradeCode derivation limit is 30`
-      if (!/^[a-z][a-z0-9]*(\.[a-z][a-z0-9-]*)+$/.test(v)) return 'must be reverse-DNS (lowercase, e.g. com.acme.app)'
+      if (!/^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)+$/.test(v)) {
+        return 'must be reverse-DNS with [a-z][a-z0-9]* segments (no hyphens — Android forbids them; no underscores — iOS forbids them)'
+      }
       return null
     },
   },
-  WINDOWS_PUBLISHER: {
-    prompt: 'Windows publisher display name (installer + Add/Remove Programs)',
-    default: (ctx) => ctx.answers.PROJECT_NAME ?? ctx.dirName ?? 'My Company',
-    validate: (v) => (v.trim() === '' ? 'must not be empty' : null),
+  // Deep-link scheme: expo-router linking + the expo-auth-session redirect URI.
+  // A scheme is registered OS-wide, so collisions hijack redirects — derive it
+  // from the slug and keep it plain lowercase alphanumerics.
+  APP_SCHEME: {
+    prompt: 'Deep-link URL scheme (lowercase alphanumerics, e.g. acmecurriculum)',
+    default: (ctx) =>
+      (ctx.answers.PROJECT_SLUG ?? ctx.dirName ?? 'myapp').toLowerCase().replace(/[^a-z0-9]+/g, ''),
+    validate: (v) => (/^[a-z][a-z0-9]*$/.test(v) ? null : 'must be a lowercase alphanumeric scheme starting with a letter'),
   },
-  // The server origin the desktop client talks to. Feeds the COMMITTED CSP in
-  // tauri.conf.json (connect-src) — which is why it is a placeholder, not env.
+  // The server origin the mobile client talks to. Feeds the COMMITTED
+  // app.config.ts extra.apiOrigin and the transport-security policy the
+  // expo-policy gate asserts (https-or-loopback) — which is why it is a
+  // placeholder, not env.
   API_ORIGIN: {
-    prompt: 'API origin the desktop client connects to (e.g. https://api.internal.example.edu)',
+    prompt: 'API origin the mobile client connects to (e.g. https://api.internal.example.edu)',
     default: (_ctx) => 'http://127.0.0.1:8787',
     validate: (v) =>
       /^https?:\/\/[a-zA-Z0-9.-]+(:\d+)?$/.test(v)
         ? null
-        : 'must be a bare origin — http(s)://host[:port], no path or trailing slash (it lands in the CSP connect-src)',
+        : 'must be a bare origin — http(s)://host[:port], no path or trailing slash (it lands in the committed transport policy)',
   },
   DB_NAME: {
     prompt: 'Postgres database name',
@@ -77,6 +87,28 @@ export const PLACEHOLDERS = {
     prompt: 'Default git branch',
     default: () => 'main',
     validate: (v) => (/^[\w./-]+$/.test(v) ? null : 'must be a valid branch name'),
+  },
+  // EAS/store identity — NOT secrets (ASC app ids and team ids appear in every
+  // App Store URL; the EAS project id is printed by `eas init`). They are
+  // placeholders because eas.json/app.config.ts commit them; 'TBD' is accepted
+  // so init never blocks on store onboarding — doctor warns while it remains.
+  EAS_PROJECT_ID: {
+    prompt: 'EAS project id (UUID from `eas init`, or TBD)',
+    default: () => 'TBD',
+    validate: (v) =>
+      v === 'TBD' || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)
+        ? null
+        : 'must be the EAS project UUID (from `eas init`) or TBD',
+  },
+  ASC_APP_ID: {
+    prompt: 'App Store Connect app id (numeric, or TBD)',
+    default: () => 'TBD',
+    validate: (v) => (v === 'TBD' || /^\d+$/.test(v) ? null : 'must be the numeric ASC app id or TBD'),
+  },
+  APPLE_TEAM_ID: {
+    prompt: 'Apple Developer team id (10 chars, or TBD)',
+    default: () => 'TBD',
+    validate: (v) => (v === 'TBD' || /^[A-Z0-9]{10}$/.test(v) ? null : 'must be the 10-character Apple team id or TBD'),
   },
 }
 

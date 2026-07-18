@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// tauri-postgres-agent-harness installer.
-//   npx --yes github:<owner>/tauri-postgres-agent-harness#<tag> <command> [flags]
+// expo-postgres-agent-harness installer.
+//   npx --yes github:<owner>/expo-postgres-agent-harness#<tag> <command> [flags]
 // Commands: init | update | doctor | enable <module> | disable <module>
 import { parseArgs } from 'node:util'
 import { resolve } from 'node:path'
@@ -36,7 +36,7 @@ const opts = {
   report: values.report,
 }
 
-const USAGE = `tauri-postgres-agent-harness
+const USAGE = `expo-postgres-agent-harness
 
 Usage:
   init     [--dir .] [--tier core|standard|strict] [--modules a,b] [--yes]
@@ -46,15 +46,16 @@ Usage:
            seeded, project-owned file or whole subtree — e.g. a trailing '/'
            dir: overwrite when untouched, park on drift)
   doctor   [--dir .]
-  graduate [--dir .]  (advance baseVersion once the ramped v0.1.6 checks are
-           clean — runs validate, refuses while any ramp NOTE remains)
-  enable   <module>   (ci-windows-release, ci-windows-e2e, ci-macos, ci-provenance,
-           mutation, gate-a11y-deep, crash-reporting, ops-backup, eval-live,
-           observability)
+  graduate [--dir .]  (advance baseVersion once ramped checks are clean —
+           runs validate, refuses while any ramp NOTE remains)
+  enable   <module>   (ci-mobile-release, device-e2e, eas-update, store-metadata,
+           ci-provenance, gate-a11y-deep, crash-reporting, push-notifications,
+           ops-backup, eval-live, observability)
   disable  <module>
 
-Placeholders: PROJECT_NAME PROJECT_SLUG PRODUCT_IDENTIFIER WINDOWS_PUBLISHER
-              API_ORIGIN DB_NAME GITHUB_OWNER SECURITY_OWNERS DEFAULT_BRANCH`
+Placeholders: PROJECT_NAME PROJECT_SLUG APP_IDENTIFIER APP_SCHEME API_ORIGIN
+              DB_NAME GITHUB_OWNER SECURITY_OWNERS DEFAULT_BRANCH
+              EAS_PROJECT_ID ASC_APP_ID APPLE_TEAM_ID`
 
 try {
   let code = 0

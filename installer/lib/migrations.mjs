@@ -7,7 +7,7 @@
 //       "promotedModules": ["gate-perf-budget"],
 //       "configSteps": [{ "name": "e2e", "cmd": "node tools/check-e2e.mjs", "after": "build" }],
 //       "configCommandUpdates": [{ "name": "lint", "from": "old cmd", "to": "new cmd" }],
-//       "seedOnInitOnly": ["apps/desktop/src/features/matrix/", "apps/desktop/src/router.ts"]
+//       "seedOnInitOnly": ["apps/mobile/src/features/matrix/", "apps/mobile/src/routes.ts"]
 //     }
 //   }
 // Without this, a newer template can only ADD files to installed projects:
@@ -84,7 +84,7 @@ export function seedOnInitOnlyPatterns(migrations) {
 // Return the seedOnInitOnly pattern an installPath falls under, or null. A
 // trailing '/' matches the whole subtree (prefix); no slash matches an exact
 // file. The installPath is POSIX-normalized first, so a Windows-supplied
-// backslash path (`apps\desktop\src\router.ts`) still matches. Callers key the
+// backslash path (`apps\mobile\src\routes.ts`) still matches. Callers key the
 // "not auto-planted" report note off the returned pattern so the note fires once
 // per matched cluster, not once per file.
 export function matchSeedOnInitOnly(installPath, patterns) {

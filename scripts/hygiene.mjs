@@ -48,7 +48,10 @@ const LEAK_PATTERNS = [
 ]
 
 // Files allowed to mention a pattern (path suffix → patterns allowed there).
-const ALLOWLIST = new Map()
+const ALLOWLIST = new Map([
+  // The secret-scanning POLICY must spell the PEM header it detects.
+  ['template/base/gitleaks.toml', [/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/]],
+])
 
 const failures = []
 
