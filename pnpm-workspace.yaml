@@ -9,3 +9,9 @@
 # 6.0.3 matches the consumer catalog pin (template/base/pnpm-workspace.yaml).
 overrides:
   typescript: 6.0.3
+
+# Same determinism pin as template/base/pnpm-workspace.yaml (see the full
+# rationale there): dependency aging is Renovate's job at the update-PR layer;
+# an ambient CI runner policy re-applying a wall-clock 24h age check per pnpm
+# invocation must not be able to red this repo's own CI nondeterministically.
+minimumReleaseAge: 0

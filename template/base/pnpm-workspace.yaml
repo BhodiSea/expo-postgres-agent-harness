@@ -12,6 +12,18 @@ allowBuilds:
   esbuild: true
   lefthook: true
 
+# Package-aging protection lives in Renovate (renovate.json minimumReleaseAge
+# "5 days": updates age inside a reviewed PR, at the update layer) — NOT in
+# pnpm's runtime lockfile verification. Left unpinned, ambient CI policy
+# (GitHub hosted runners inject a supply-chain default) re-applies a 24h age
+# check per pnpm invocation against a moving wall-clock cutoff: the same
+# committed lockfile installs green, then fails `pnpm exec` minutes later
+# whenever upstream published <24h before the run (observed live: an Expo
+# 57.0.x patch wave reddened the selftest canary job 49 minutes short of the
+# cutoff while every earlier pnpm call in the same job passed). Pinning 0
+# makes the project's posture explicit and its gate chain deterministic.
+minimumReleaseAge: 0
+
 catalog:
   # ---- toolchain --------------------------------------------------------------
   typescript: ~6.0.3 # typescript-eslint 8.63.x supports >=4.8.4 <6.1.0
