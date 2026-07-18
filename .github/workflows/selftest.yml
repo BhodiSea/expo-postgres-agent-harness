@@ -721,10 +721,15 @@ jobs:
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 22
+      # The dir name "app" is LOAD-BEARING: init derives the DB_NAME placeholder
+      # from the directory name, and the rendered db/init/01-roles.sql runs
+      # `ALTER DATABASE "<DB_NAME>"` against the service container's database —
+      # which is literally named "app". A mismatch reds role provisioning with
+      # `database "<dir>" does not exist`.
       - name: Bootstrap a fresh project
-        run: node installer/cli.mjs init --dir "$GITHUB_WORKSPACE/.selftest/int" --tier core --yes
+        run: node installer/cli.mjs init --dir "$GITHUB_WORKSPACE/.selftest/app" --tier core --yes
       - name: Git baseline + corepack
-        working-directory: .selftest/int
+        working-directory: .selftest/app
         run: |
           git init -q -b main
           git add -A
@@ -732,19 +737,19 @@ jobs:
           corepack enable
           corepack prepare --activate
       - name: pnpm install
-        working-directory: .selftest/int
+        working-directory: .selftest/app
         run: pnpm install --no-frozen-lockfile
       - name: Provision database roles (db/init/01-roles.sql)
-        working-directory: .selftest/int
+        working-directory: .selftest/app
         run: psql 'postgres://postgres:postgres@127.0.0.1:5432/app' -v ON_ERROR_STOP=1 -f db/init/01-roles.sql
       - name: Apply migrations
-        working-directory: .selftest/int
+        working-directory: .selftest/app
         run: pnpm db:migrate
       # Positive control on the human tooling the lane leans on: the dev-token
       # minter must actually mint (an empty token here would make the suite's
       # own mint path the only coverage, silently).
       - name: mint-dev-token mints (server scripts positive control)
-        working-directory: .selftest/int
+        working-directory: .selftest/app
         run: |
           token="$(pnpm --filter server mint-dev-token | tail -1)"
           if [ -z "$token" ]; then
@@ -753,7 +758,7 @@ jobs:
           fi
           echo "mint-dev-token: OK (${#token} chars)"
       - name: Boot the API server (stub auth mode)
-        working-directory: .selftest/int
+        working-directory: .selftest/app
         run: |
           set -euo pipefail
           pnpm --filter server dev > /tmp/server.log 2>&1 &
@@ -765,10 +770,10 @@ jobs:
           done
           echo "::error::the API server never became healthy"; cat /tmp/server.log; exit 1
       - name: Baseline — the LIVE_PROOF suite is green against the real stack
-        working-directory: .selftest/int
+        working-directory: .selftest/app
         run: pnpm --filter mobile exec jest --silent __tests__/live-api-proof.test.ts
       - name: 'Canary C01: strip the Authorization header from the api-client one door → the live suite must FAIL'
-        working-directory: .selftest/int
+        working-directory: .selftest/app
         run: |
           # Remove the ONE line that attaches the bearer — the exact defect class
           # the desktop-era source harness shipped while every mocked lane stayed
@@ -803,7 +808,7 @@ jobs:
           git checkout -q -- apps/mobile/src/lib/api-client.ts
           echo 'canary OK: stripping the bearer reddened the live suite'
       - name: Restore sanity — the suite is green again after the revert
-        working-directory: .selftest/int
+        working-directory: .selftest/app
         run: pnpm --filter mobile exec jest --silent __tests__/live-api-proof.test.ts
       - name: Server log on failure
         if: failure()
@@ -870,10 +875,15 @@ jobs:
           echo "3440825f514f537c6a96bcf5de995780c2a4a7f83a43208fdc95d4f1fecfad3b  maestro.zip" | sha256sum -c -
           unzip -q maestro.zip -d "$HOME/.maestro-dist"
           echo "$HOME/.maestro-dist/maestro/bin" >> "$GITHUB_PATH"
+      # The dir name "app" is LOAD-BEARING: init derives the DB_NAME placeholder
+      # from the directory name, and the rendered db/init/01-roles.sql runs
+      # `ALTER DATABASE "<DB_NAME>"` against the service container's database —
+      # which is literally named "app". A mismatch reds role provisioning with
+      # `database "<dir>" does not exist`.
       - name: Bootstrap a fresh project
-        run: node installer/cli.mjs init --dir "$GITHUB_WORKSPACE/.selftest/smoke" --tier core --yes
+        run: node installer/cli.mjs init --dir "$GITHUB_WORKSPACE/.selftest/app" --tier core --yes
       - name: Git baseline + corepack
-        working-directory: .selftest/smoke
+        working-directory: .selftest/app
         run: |
           git init -q -b main
           git add -A
@@ -881,15 +891,15 @@ jobs:
           corepack enable
           corepack prepare --activate
       - name: pnpm install
-        working-directory: .selftest/smoke
+        working-directory: .selftest/app
         run: pnpm install --no-frozen-lockfile
       - name: Provision database roles + migrations
-        working-directory: .selftest/smoke
+        working-directory: .selftest/app
         run: |
           psql 'postgres://postgres:postgres@127.0.0.1:5432/app' -v ON_ERROR_STOP=1 -f db/init/01-roles.sql
           pnpm db:migrate
       - name: Boot the API server (stub auth mode — the mutation flow's backend)
-        working-directory: .selftest/smoke
+        working-directory: .selftest/app
         run: |
           set -euo pipefail
           pnpm --filter server dev > /tmp/server.log 2>&1 &
@@ -901,7 +911,7 @@ jobs:
           done
           echo "::error::the API server never became healthy"; cat /tmp/server.log; exit 1
       - name: Prebuild + assemble (release for the sweeps, debug for the dev half)
-        working-directory: .selftest/smoke/apps/mobile
+        working-directory: .selftest/app/apps/mobile
         env:
           EXPO_PUBLIC_API_ORIGIN: 'http://127.0.0.1:8787'
           # Boot-shape dummies, not credentials: the release binary must install
@@ -940,7 +950,7 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          working-directory: .selftest/smoke
+          working-directory: .selftest/app
           script: |
             set -euo pipefail
             appid="$(node -e 'console.log(JSON.parse(require("node:fs").readFileSync("tools/identity.lock.json","utf8")).appIdentifier)')"
@@ -1042,6 +1052,6 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: maestro-smoke-evidence
-          path: .selftest/smoke/artifacts/maestro/
+          path: .selftest/app/artifacts/maestro/
           retention-days: 7
           if-no-files-found: ignore

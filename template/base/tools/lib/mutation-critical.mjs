@@ -67,6 +67,12 @@ const CRITICAL_EXCLUDES = [
   'apps/mobile/src/lib/api-client.ts',
   'apps/mobile/src/lib/boot-timing.ts',
   'apps/mobile/src/lib/log.ts',
+  // React-hooks module (useEffect/rAF), jest-expo lane — and dev-only perf
+  // tooling besides (consumed solely by app/perf-harness.tsx, which renders
+  // perf-unavailable outside __DEV__). Behavioural net: 12 jest tests
+  // (perf-probes.test.ts), the perf-harness journey, and Canary 20's
+  // busy-loop red-proof in the device lane.
+  'apps/mobile/src/lib/perf-probes.ts',
 ]
 
 /** Stryker's `mutate` globs. Tests, type decls and the carve-outs above are excluded. */
