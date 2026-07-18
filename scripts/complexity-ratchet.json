@@ -4,7 +4,7 @@
   "functions": {
     "installer/commands/doctor.mjs::doctor": 73,
     "installer/commands/enable.mjs::enable": 54,
-    "installer/commands/init.mjs::init": 133,
+    "installer/commands/init.mjs::init": 130,
     "installer/commands/update.mjs::update": 66,
     "installer/lib/merge-claude-settings.mjs::mergeClaudeSettings": 19,
     "installer/lib/merge-workspace-yaml.mjs::parseSimpleYaml": 24,

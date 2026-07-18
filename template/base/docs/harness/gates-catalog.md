@@ -508,12 +508,12 @@ ci-provenance + ci-mobile-release, `strict` = all.
 | `device-e2e` | the extended on-device Maestro matrix beyond the base lane | slow emulator runners; the base lane covers the floor |
 | `eas-update` | OTA update channel wiring + staged-rollout runbooks | OTA is a policy decision (runtimeVersion reach, rollback story) |
 | `store-metadata` | store listing metadata as reviewable JSON in-repo (+ iOS privacy manifests) | meaningful once a listing exists |
-| `ci-provenance` | SBOM + build attestation + verification step | meaningful once artifacts ship to a consumer who verifies them |
+| `ci-provenance` | SBOM + build attestation + verification step + NOTICES drift check | meaningful once artifacts ship to a consumer who verifies them |
 | `gate-a11y-deep` | screen-reader checklist + extended a11y assertions beyond the lint/RNTL floor | needs human-in-the-loop passes; the floor already lint/test-enforces |
 | `crash-reporting` | crash/error ingestion wiring, symbol upload, redaction unit test | needs an ingestion endpoint; redaction policy is project-specific |
 | `push-notifications` | push credential wiring + permission-prompt discipline | a product decision with store-policy weight |
 | `ops-backup` | pgBackRest configuration + restore-drill runner | operational infrastructure, not repo code |
-| `eval-live` | GPU-runner live-model eval lane | needs GPU hardware and a served model; the default eval is fixture-scored by design |
+| `eval-live` | GPU-runner live-model eval lane: GBNF/schema pre-validation, exemplar/holdout disjointness check | needs GPU hardware and a served model; the default eval is fixture-scored by design |
 | `observability` | OpenTelemetry wiring for the server + span-per-route test | adds a runtime dependency and an OTLP target decision better made deliberately |
 
 ## Considered and rejected

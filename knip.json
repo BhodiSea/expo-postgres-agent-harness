@@ -22,6 +22,13 @@
     "template/base/tests/**/*.mjs"
   ],
   "ignore": [
+    // template trees are CONSUMER source, not repo source. stack/** and the
+    // base .ts files resolve only inside a scaffold (workspace deps, jest-expo).
+    // modules/** stays ignored DELIBERATELY now that W7 ships files: module
+    // tools import ./lib/gate.mjs — template/base/tools/lib/gate.mjs, which
+    // exists at that relative path only after `enable` installs them next to
+    // the base tools — and module .ts/.tsx/.txt files need consumer deps.
+    // Scanned here they would all red as unresolved imports (same call as SRC).
     "template/stack/**",
     "template/modules/**",
     "template/base/**/*.ts"

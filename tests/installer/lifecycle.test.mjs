@@ -4,13 +4,14 @@
 // Ported from the tauri-postgres-agent-harness suite and adapted to this
 // repo's layout truth (installer/lib/layout.mjs): apps/mobile Expo app,
 // APP_IDENTIFIER store identity (identity.lock.json), empty RETIRED_MODULES,
-// and a template/modules tree that ships no files until W7 — module tests
-// self-arm via a skip guard when the first module lands.
+// and the 11 W7 opt-in module trees (the pre-W7 skip guards armed when the
+// module files landed; shippedModules() keeps them honest about the tree).
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { execFileSync, spawnSync } from 'node:child_process'
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -327,37 +328,51 @@ test('enable rejects unknown modules with the known-module list', () => {
   assert.ok(res.out.includes('ci-mobile-release'), 'the error must name the known modules')
 })
 
-// ODDITY (pinned current behavior, self-disarms when W7 lands module files):
-// `enable` fails loud when a module tree resolves to zero files ("installer
-// packaging is broken"), but `init --tier standard` on the SAME empty tree
-// silently records the tier's modules in the manifest with zero installed
-// files — a false-green enable by the installer's own fail-loud doctrine.
-// `update` then tolerates the recorded-but-fileless modules (absent template
-// dirs walk to zero entries), which is why installs made today keep working.
-test('ODDITY: init records standard-tier modules that installed zero files, while enable refuses them', (t) => {
-  if (shippedModules().length > 0) {
-    t.skip('template/modules now ships files — the empty-tree oddity no longer applies; revisit init’s zero-file module guard')
-    return
-  }
-  const dir = mkdtempSync(join(tmpdir(), 'epah-oddmod-'))
+// The pre-W7 ODDITY is CLOSED: `init` now mirrors `enable`'s zero-file guard.
+// (Previously `init --tier standard` on an empty module tree silently recorded
+// the tier's modules with zero installed files — a false-green manifest entry
+// by the installer's own fail-loud doctrine.) Healthy half: with the W7 module
+// trees shipped, a standard-tier init records its modules AND attributes real
+// installed files to each. Red half: against a doctored installer copy whose
+// ci-provenance tree is emptied, the same init fails loud BEFORE writing
+// anything — proving the guard, not just the happy path.
+test('init fails loud when a tier module resolves to zero files; healthy tiers attribute real files', () => {
+  // Healthy: the real template tree.
+  const dir = mkdtempSync(join(tmpdir(), 'epah-tiermod-'))
   assert.equal(run(['init', '--dir', dir, '--yes', '--tier', 'standard', ...SETS]).code, 0)
   const manifest = JSON.parse(readFileSync(join(dir, '.harness/manifest.json'), 'utf8'))
   assert.deepEqual(
     [...manifest.modules].sort(),
     ['ci-mobile-release', 'ci-provenance'],
-    'standard tier records its modules even with no template files',
+    'standard tier must record exactly its modules',
   )
-  const moduleFiles = Object.values(manifest.files).filter((meta) => meta.module)
-  assert.equal(moduleFiles.length, 0, 'no module attributed a single installed file')
+  for (const m of manifest.modules) {
+    const owned = Object.entries(manifest.files).filter(([, meta]) => meta.module === m)
+    assert.ok(owned.length > 0, `tier module ${m} attributed no installed files`)
+    for (const [ip] of owned) assert.ok(existsSync(join(dir, ip)), `module file missing on disk: ${ip}`)
+  }
 
-  // The same zero-file condition IS fatal through the enable door.
-  const en = run(['enable', 'ci-provenance', '--dir', dir])
-  assert.equal(en.code, 1, en.out)
-  assert.ok(en.out.includes('resolved to zero files'), en.out)
-
-  // And update must survive the recorded-but-fileless module list.
-  const upd = run(['update', '--dir', dir])
-  assert.notEqual(upd.code, 1, upd.out)
+  // Red: a doctored copy of installer+template with an emptied module tree.
+  // (The guard is unreachable through the real tree now that every module
+  // ships files — the copy is how the red path stays exercised.)
+  const copyRoot = mkdtempSync(join(tmpdir(), 'epah-zeromod-'))
+  for (const p of ['installer', 'template', 'package.json']) {
+    cpSync(fileURLToPath(new URL(`../../${p}`, import.meta.url)), join(copyRoot, p), { recursive: true })
+  }
+  rmSync(join(copyRoot, 'template/modules/ci-provenance'), { recursive: true })
+  mkdirSync(join(copyRoot, 'template/modules/ci-provenance'))
+  const target = mkdtempSync(join(tmpdir(), 'epah-zeromod-t-'))
+  const res = spawnSync(
+    'node',
+    [join(copyRoot, 'installer/cli.mjs'), 'init', '--dir', target, '--yes', '--tier', 'standard', ...SETS],
+    { encoding: 'utf8' },
+  )
+  const out = `${res.stdout ?? ''}${res.stderr ?? ''}`
+  assert.equal(res.status, 1, out)
+  assert.ok(out.includes("module 'ci-provenance' resolved to zero files"), out)
+  assert.ok(!existsSync(join(target, '.harness/manifest.json')), 'a failed init must not write a manifest')
+  assert.ok(!existsSync(join(target, 'package.json')), 'a failed init must not write files')
+  rmSync(copyRoot, { recursive: true, force: true })
 })
 
 test('enable/disable flips a module: dry-run writes nothing, drift is parked, disable round-trips', (t) => {
@@ -407,6 +422,88 @@ test('enable/disable flips a module: dry-run writes nothing, drift is parked, di
     assert.ok(!(ip in disabled.files), `disabled module file still in manifest: ${ip}`)
     if (ip !== modRel) assert.ok(!existsSync(join(dir, ip)), `disabled module file still present: ${ip}`)
   }
+})
+
+// W7 representative round-trips, one per module SHAPE: workflow-heavy
+// (ci-mobile-release — dotless github/ storage must land at .github/workflows/),
+// doc-plus-test (observability — a file under the seeded apps/ prefix plus
+// docs), and slice-shaped (push-notifications — .ts.txt slice files installed
+// verbatim under docs/, never as live TypeScript).
+test('enable/disable round-trips representative W7 module shapes with correct install paths', () => {
+  const cases = [
+    {
+      name: 'ci-mobile-release',
+      expect: [
+        '.github/workflows/release-please.yml',
+        '.github/workflows/release-mobile.yml',
+        '.github/workflows/preview-mobile.yml',
+        'release-please-config.json',
+        'docs/modules/ci-mobile-release/README.md',
+      ],
+    },
+    {
+      name: 'observability',
+      expect: [
+        'apps/server/src/observability/span-routes.test.ts',
+        'docs/modules/observability/README.md',
+        'docs/modules/observability/otel-server.patch.md',
+      ],
+    },
+    {
+      name: 'push-notifications',
+      expect: [
+        'docs/modules/push-notifications/README.md',
+        'docs/modules/push-notifications/APPLY.md',
+        'docs/modules/push-notifications/slice/apps/server/src/routes/push-tokens.ts.txt',
+        'docs/modules/push-notifications/slice/packages/schema/drizzle/0003_push_device_tokens.sql',
+      ],
+    },
+  ]
+  const dir = mkdtempSync(join(tmpdir(), 'epah-mods3-'))
+  assert.equal(run(['init', '--dir', dir, '--yes', '--tier', 'core', ...SETS]).code, 0)
+
+  for (const c of cases) {
+    const on = run(['enable', c.name, '--dir', dir])
+    assert.equal(on.code, 0, on.out)
+    const manifest = JSON.parse(readFileSync(join(dir, '.harness/manifest.json'), 'utf8'))
+    assert.ok(manifest.modules.includes(c.name), `${c.name} not recorded`)
+    for (const ip of c.expect) {
+      assert.ok(existsSync(join(dir, ip)), `${c.name}: expected installed file missing: ${ip}`)
+      assert.equal(manifest.files[ip]?.module, c.name, `${c.name}: ${ip} not attributed in manifest`)
+    }
+  }
+  // Slice code must stay inert: no live .ts twin of the .txt slice files.
+  assert.ok(
+    !existsSync(join(dir, 'docs/modules/push-notifications/slice/apps/server/src/routes/push-tokens.ts')),
+    'slice .ts.txt must not install as live .ts',
+  )
+  // The whole enabled scaffold still renders with zero placeholder residue.
+  assert.deepEqual(placeholderResidue(dir), [], 'unrendered {{TOKENS}} after module enables')
+
+  // Disable all three: files gone, attributions gone, the scaffold's own files intact.
+  for (const c of cases) {
+    const off = run(['disable', c.name, '--dir', dir])
+    assert.equal(off.code, 0, off.out)
+  }
+  const final = JSON.parse(readFileSync(join(dir, '.harness/manifest.json'), 'utf8'))
+  for (const c of cases) {
+    assert.ok(!final.modules.includes(c.name), `${c.name} still recorded after disable`)
+    for (const ip of c.expect) {
+      assert.ok(!(ip in final.files), `${c.name}: ${ip} still in manifest after disable`)
+      assert.ok(!existsSync(join(dir, ip)), `${c.name}: ${ip} still on disk after disable`)
+    }
+    // No directory husks either: every W7 verifier flagged the empty
+    // docs/modules/<name>/ (and src/…) skeletons disable used to leave behind.
+    assert.ok(
+      !existsSync(join(dir, 'docs/modules', c.name)),
+      `${c.name}: empty docs/modules/${c.name}/ husk left after disable`,
+    )
+  }
+  assert.ok(
+    !existsSync(join(dir, 'apps/server/src/observability')),
+    'observability: empty apps/server/src/observability/ husk left after disable',
+  )
+  assert.ok(existsSync(join(dir, 'apps/server/src/app.ts')), 'disable must not touch base scaffold files')
 })
 
 test('retrofit rejects Next.js, Tauri, foreign lockfiles, and non-workspace layouts with clear messages', () => {

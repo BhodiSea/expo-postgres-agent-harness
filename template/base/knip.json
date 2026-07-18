@@ -22,6 +22,7 @@
         "metro.config.js",
         "jest.config.js",
         "src/features/matrix/perfSubject.tsx!",
+        "src/crash/redact.ts!",
         "src/lib/sse.ts!",
         "src/testing/mock-server.ts",
         "src/host/env.ts",
@@ -54,7 +55,7 @@
       "project": ["src/**/*.ts!"]
     },
     "packages/eval": {
-      "entry": ["src/index.ts!", "src/**/*.test.ts"],
+      "entry": ["src/index.ts!", "src/adapters/*.ts!", "src/**/*.test.ts"],
       "project": ["src/**/*.ts!"]
     }
   }

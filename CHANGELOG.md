@@ -107,3 +107,43 @@ beyond what the repo's own checks verify.
   GREEN), and Canary 20 (a 300ms stall on the ranking path → the perf-pass
   marker flips). The `HARNESS_W6_DEVICE_LANES` arming variable is gone —
   the lanes are unconditional on their triggers, mirroring the native job.
+- The opt-in modules (W7): all 11 `template/modules/` trees land —
+  `ci-mobile-release`, `device-e2e`, `eas-update`, `store-metadata`,
+  `ci-provenance`, `gate-a11y-deep`, `crash-reporting`, `push-notifications`,
+  `ops-backup`, `eval-live`, `observability` — each with a
+  `docs/modules/<name>/README.md` and a row in the gates-catalog module
+  table, so the `standard` and `strict` tiers now install real files.
+  Installer hardening in the same wave: `init` gains the per-module
+  zero-file guard `enable` already had (the pinned ODDITY test flips to
+  prove a zero-file tier module fails loud before anything is written), the
+  lifecycle suite round-trips representative module shapes (workflow-heavy,
+  doc-plus-test, slice-shaped) with zero placeholder residue, and the
+  mapper/walker closure's anti-vacuity floor is restored to the
+  finished-template bar (> 200 files checked). Base-template seams the
+  modules rely on: a `src/adapters/*.ts` knip entry for the eval package's
+  LLM extension point, the two titled observability placeholders in
+  `tools/test-quality-allow.json`, cspell words for the provenance module's
+  product names, and the RLS cross-tenant UPDATE probe generalized to derive
+  its probed column from each isolation target's own seed row (the
+  hard-coded `title` column red SQLSTATE 42703 on any second target whose
+  table lacks it).
+- W7 verification sweep fixes, after eleven independent module verifications:
+  the generalized RLS probe is biome-formatted (the unformatted arrow at
+  105 chars red the format gate — gate 1 of 21 — on EVERY fresh scaffold,
+  the single shared cause of all eleven red verdicts); `src/crash/redact.ts`
+  joins the mobile knip entries so enabling `crash-reporting` no longer reds
+  the dead-code gate (`knip --strict` counts a doc-wired module's only
+  reference — its own test — as non-production; the pattern is inert while
+  the module is off, proven both ways); `disable` now prunes the empty
+  directory skeletons it used to leave behind (every verifier flagged the
+  husks; locked by lifecycle assertions); a fresh scaffold's `pnpm spell` is
+  green out of the box (`{{APP_SCHEME}}` renders into the scaffold's own
+  cspell words so identifier-derived tokens pass, device/mutation-lane and
+  module-workflow product names join the dictionary, and generated
+  `NOTICES.md` + `tools/identity.lock.json` are ignorePaths); module-doc
+  gaps closed: the eas-update README's `updates.url` snippet carries the
+  `// SOURCE:` line the provenance gate requires, push-notifications
+  APPLY.md explains why the slice must be committed before the Stop chain
+  (diff-coverage measures the uncommitted diff), and the crash-reporting
+  source-map steps gate on `HAVE_TOKEN` too (no publish → no `dist/`, and
+  nothing shipped that needs maps).

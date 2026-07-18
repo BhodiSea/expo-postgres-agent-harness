@@ -13,6 +13,23 @@ import { printReport } from '../lib/report.mjs'
 import { collectAnswers, parseSets } from '../lib/prompts.mjs'
 import { writeInstallFile } from '../lib/write-file.mjs'
 
+// Plan every requested module's tree, tagging each entry with its module name.
+// Fail loud, never fail open (mirror of `enable`): a tier/module list entry
+// resolving to zero files would still be recorded in manifest.modules — a
+// false-green "enabled" module with nothing installed (the pre-W7 oddity).
+function planModules(modules, answers) {
+  const out = []
+  for (const m of modules) {
+    const entries = planTree(`modules/${m}`, answers)
+    if (entries.length === 0) {
+      throw new Error(`module '${m}' resolved to zero files — installer packaging is broken`)
+    }
+    for (const e of entries) e.module = m
+    out.push(...entries)
+  }
+  return out
+}
+
 // eslint-disable-next-line sonarjs/cognitive-complexity -- ceiling is machine-enforced by scripts/complexity-ratchet.json (G16); this directive only silences the rule, the ratchet is what stops the score growing
 export async function init(opts) {
   const targetDir = opts.dir
@@ -66,11 +83,7 @@ export async function init(opts) {
   if (plan.length === 0) {
     throw new Error('template tree resolved to zero files — installer packaging is broken')
   }
-  for (const m of modules) {
-    const entries = planTree(`modules/${m}`, answers)
-    for (const e of entries) e.module = m
-    plan.push(...entries)
-  }
+  plan.push(...planModules(modules, answers))
 
   const report = { title: `harness init (${det.mode})`, written: [], skipped: [], conflicts: [], drift: [], notes: [] }
   const files = {}

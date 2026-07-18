@@ -69,11 +69,19 @@ if (!RLS_SUITE_READY) {
       expect(read).toHaveLength(0)
 
       // UPDATE / DELETE across users: statements match nothing (0 rows), no error.
+      // The probed column comes from the target's OWN seed row — hard-coding a
+      // column name (the old `SET title = ...`) reds SQLSTATE 42703 on any
+      // second ISOLATION_TARGET whose table has no such column.
+      const probeSample = t.seedRow(USER_B)
+      const probeColumn = Object.keys(probeSample).find((c) => c !== t.ownerColumn)
+      if (probeColumn === undefined) {
+        throw new Error(`${t.table}: seedRow has no non-owner column to probe`)
+      }
       const updated = await withUser(
         sql,
         USER_A,
         (tx) =>
-          tx`UPDATE ${tx(t.table)} SET title = 'pwned' WHERE ${tx(t.ownerColumn)} = ${USER_B}`,
+          tx`UPDATE ${tx(t.table)} SET ${tx(probeColumn)} = ${'pwned'} WHERE ${tx(t.ownerColumn)} = ${USER_B}`,
       )
       expect(updated.count).toBe(0)
       const deleted = await withUser(
@@ -88,14 +96,15 @@ if (!RLS_SUITE_READY) {
         withUser(sql, USER_A, (tx) => tx`INSERT INTO ${tx(t.table)} ${tx(t.seedRow(USER_B))}`),
       ).rejects.toMatchObject({ code: '42501' })
 
-      // B still sees B's data untouched (title not 'pwned', row count intact).
+      // B still sees B's data untouched (probe column not 'pwned', row count intact).
       const bOwn = await withUser(
         sql,
         USER_B,
-        (tx) => tx`SELECT title FROM ${tx(t.table)} WHERE ${tx(t.ownerColumn)} = ${USER_B}`,
+        (tx) =>
+          tx`SELECT ${tx(probeColumn)} FROM ${tx(t.table)} WHERE ${tx(t.ownerColumn)} = ${USER_B}`,
       )
       expect(bOwn.length).toBeGreaterThanOrEqual(1)
-      for (const row of bOwn) expect(row['title']).not.toBe('pwned')
+      for (const row of bOwn) expect(row[probeColumn]).not.toBe('pwned')
     })
 
     it('does not leak identity across the pooled connection (GUC hygiene)', async () => {

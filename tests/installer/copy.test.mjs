@@ -204,10 +204,11 @@ test('storageToInstall agrees with walkTemplate on EVERY real template file (no 
       checked += 1
     }
   }
-  // PORT NOTE: the anti-vacuity floor is 200 in the finished template; the port
-  // skeleton ships ~a dozen files. Raise back to > 200 when the stack + module
-  // trees land (tracked in design/PORT-SPEC.md workstreams).
-  assert.ok(checked > 10, `expected the template surface, checked only ${checked}`)
+  // Anti-vacuity floor: the full template surface (base + stack + the 11 W7
+  // module trees) walks to 300+ files — a mapper/walker closure that "passed"
+  // over a handful of files would prove nothing. (The W0 port skeleton ran at
+  // > 10; restored to the finished-template floor when the module trees landed.)
+  assert.ok(checked > 200, `expected the template surface, checked only ${checked}`)
 })
 
 // readdirSync that treats a missing dir as empty — module trees are optional.

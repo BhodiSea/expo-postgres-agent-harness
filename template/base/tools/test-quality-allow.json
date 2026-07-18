@@ -8,6 +8,14 @@
     {
       "test": "tests/rls/plan-regression.test.ts::RLS plan regression (skipped: database not ready)",
       "reason": "Same RLS self-skip as cross-tenant-isolation: the DAL query-plan probe EXPLAINs against real Postgres at seed scale, so it cannot run without a database. Fail-closed in CI via tests/rls/run-rls.mjs."
+    },
+    {
+      "test": "apps/server/src/observability/span-routes.test.ts::emits exactly one server span per request, named from this manifest (wire @opentelemetry/sdk-node + an InMemorySpanExporter, request each route, assert one span with the manifest name)",
+      "reason": "observability module: a deliberate, titled placeholder. Asserting real span emission needs @opentelemetry/sdk-node + an InMemorySpanExporter wired into the test host, which the module does not ship (it ships the manifest and the route-name contract). The title IS the specification for whoever wires the SDK. Tracked in docs/modules/observability/README.md."
+    },
+    {
+      "test": "apps/server/src/observability/span-routes.test.ts::propagates pino log correlation (trace_id/span_id appear on request-scoped log lines via instrumentation-pino)",
+      "reason": "observability module: same placeholder class as above — proving trace/log correlation requires the OTel SDK and instrumentation-pino to be live in-process. Tracked in docs/modules/observability/README.md."
     }
   ]
 }
