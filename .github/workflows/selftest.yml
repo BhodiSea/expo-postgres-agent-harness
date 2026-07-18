@@ -1,0 +1,79 @@
+# Self-test: prove the installer + template produce a working, gate-green
+# Expo + Hono + Postgres monorepo on every change. This matrix IS the release
+# acceptance test; it grows with the port (see design/PORT-SPEC.md) — the
+# bootstrap/canary/emulator lanes land with their workstreams, and no job in
+# this matrix may ever require EAS, Apple, or Google credentials.
+name: selftest
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: selftest-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Both unit lanes run on ubuntu AND windows: the path-separator/CRLF/shell
+  # bug class only reproduces on a real Windows filesystem — a Linux-only unit
+  # lane cannot make that class extinct.
+  installer-unit:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        # harden-runner egress blocking is unsupported on Windows (audit-only);
+        # declaring audit everywhere keeps the two legs honest and identical.
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+      - run: node scripts/check-syntax.mjs
+      - run: node scripts/hygiene.mjs
+      # Coverage floor over the installer itself. Measured 82.9/78.5/96.4 with
+      # the W1 test set (lifecycle/graduate tests return with the populated
+      # template); floors sit under with headroom and rise back toward the
+      # source harness's bar as those tests return.
+      - run: >-
+          node --test --experimental-test-coverage
+          --test-coverage-include='installer/**'
+          --test-coverage-lines=78 --test-coverage-branches=70 --test-coverage-functions=90
+          "tests/**/*.test.mjs"
+
+  # A rendered scaffold carries no unrendered {{PLACEHOLDER}} and no
+  # cross-stack residue — proven on a real init into a scratch dir.
+  render-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+      - name: init --yes into a scratch dir
+        run: node installer/cli.mjs init --dir "$RUNNER_TEMP/scaffold" --tier core --yes
+      - name: zero unrendered placeholders
+        run: node scripts/check-residue.mjs "$RUNNER_TEMP/scaffold"
+      - name: rendered tree passes the syntax scan
+        run: node scripts/check-syntax.mjs "$RUNNER_TEMP/scaffold"
