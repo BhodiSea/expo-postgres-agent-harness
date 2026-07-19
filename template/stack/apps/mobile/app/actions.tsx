@@ -147,7 +147,7 @@ export default function ActionsModal() {
   }
 
   return (
-    <Screen testID="actions-screen">
+    <Screen keyboard testID="actions-screen">
       <AppText variant="title">{t('route.actions')}</AppText>
       {/* eslint-disable-next-line react-native-a11y/has-accessibility-hint -- the label + placeholder already say everything a hint would; a third repetition is screen-reader noise */}
       <Input

@@ -57,7 +57,7 @@ export default function SignInScreen() {
 
   if (entra) {
     return (
-      <Screen testID="sign-in-screen">
+      <Screen keyboard testID="sign-in-screen">
         <AppText variant="title">{t('signin.title')}</AppText>
         <AppText variant="muted">{t('signin.entra.body')}</AppText>
         {failure !== null && (
@@ -78,7 +78,7 @@ export default function SignInScreen() {
   }
 
   return (
-    <Screen testID="sign-in-screen">
+    <Screen keyboard testID="sign-in-screen">
       <AppText variant="title">{t('signin.title')}</AppText>
       <AppText variant="muted">{t('signin.body')}</AppText>
       <Field label={t('signin.subject.label')} error={subjectError}>

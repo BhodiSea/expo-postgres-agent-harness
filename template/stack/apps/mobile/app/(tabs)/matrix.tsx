@@ -1,6 +1,7 @@
 import { View } from 'react-native'
 import { AppText } from '../../src/components/AppText'
 import { Button } from '../../src/components/Button'
+import { Card } from '../../src/components/Card'
 import { EmptyState } from '../../src/components/EmptyState'
 import { Screen } from '../../src/components/Screen'
 import { Skeleton } from '../../src/components/Skeleton'
@@ -12,7 +13,7 @@ import { useKeysetQuery } from '../../src/features/matrix/useKeysetQuery'
 import { useI18n } from '../../src/i18n'
 import { ROUTES } from '../../src/routes'
 import { type Palette, useThemedStyles } from '../../src/theme/theme'
-import { radius, spacing } from '../../src/theme/tokens.gen'
+import { spacing } from '../../src/theme/tokens.gen'
 
 // The matrix route's screen. Same three canonical data states as the home panel
 // (loading/empty/error testIDs from src/routes.ts, driven by the states sweep),
@@ -23,15 +24,7 @@ import { radius, spacing } from '../../src/theme/tokens.gen'
 // ROUTES entry 1 IS the matrix entry (id 'matrix') — literal-typed testIDs.
 const MATRIX = ROUTES[1]
 
-const matrixStyles = (palette: Palette) => ({
-  errorBox: {
-    // border-danger: the failure surface must not be the same box as the empty one.
-    borderColor: palette.danger,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    gap: spacing * 2,
-    padding: spacing * 3,
-  },
+const matrixStyles = (_palette: Palette) => ({
   loadMoreRow: {
     alignItems: 'center' as const,
     flexDirection: 'row' as const,
@@ -68,9 +61,10 @@ export default function MatrixScreen() {
         />
       )}
       {state.status === 'error' && (
-        // Styled box (border/padding), so the container-level testID survives
-        // Fabric — it must CONTAIN the retry button per the manifest contract.
-        <View style={styles.errorBox} testID={MATRIX.states.error}>
+        // The danger-toned Card: the failure surface must not be the same box
+        // as the empty one, and the container-level testID survives Fabric on
+        // the styled Card — it must CONTAIN the retry button per the manifest.
+        <Card tone="danger" testID={MATRIX.states.error}>
           {/* Three registers — the same contract NotesPanel documents: WHAT
               failed (catalog), WHY (catalog copy selected by the envelope's
               stable `code`), and the raw failure text, untranslatable by
@@ -85,7 +79,7 @@ export default function MatrixScreen() {
             </AppText>
           )}
           <Button label={t('common.retry')} onPress={reload} />
-        </View>
+        </Card>
       )}
       {state.status === 'ready' && (
         <>
@@ -100,7 +94,12 @@ export default function MatrixScreen() {
               columns: MATRIX_COLUMNS.length,
             })}
           </AppText>
-          <MatrixList rows={rows} columns={MATRIX_COLUMNS} onEndReached={loadMore} />
+          <MatrixList
+            rows={rows}
+            columns={MATRIX_COLUMNS}
+            onEndReached={loadMore}
+            onRefresh={reload}
+          />
           {state.loadMoreFailed && (
             <View style={styles.loadMoreRow}>
               <AppText variant="muted" role="alert">

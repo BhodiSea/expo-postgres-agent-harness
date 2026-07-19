@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { KeyboardAvoidingView, Platform, View } from 'react-native'
+import { View } from 'react-native'
 import { Button } from '../../components/Button'
 import { Field } from '../../components/Field'
 import { Input } from '../../components/Input'
@@ -17,10 +17,8 @@ import type { CreateNoteStatus, SubmitOutcome } from './useCreateNote'
 // accessible name, so it must stay catalog copy: a screen reader announces the
 // pending state by reading it.
 //
-// KeyboardAvoidingView: the composer sits above a list on a phone screen — when
-// the soft keyboard rises it must lift the form, not cover it. iOS pads (the
-// keyboard overlays the window there); Android's default resize behavior
-// already reflows the viewport, so no behavior prop is set.
+// Keyboard avoidance is the SCREEN's job (Screen's `keyboard` prop — the home
+// route sets it), so the composer stays pure presentation.
 
 interface NoteComposerProps {
   readonly status: CreateNoteStatus
@@ -62,38 +60,36 @@ export function NoteComposer({
   }
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Field label={t('notes.composer.label')} error={fieldError ?? undefined}>
-        {(control) => (
-          <View style={styles.row}>
-            <View style={styles.inputSlot}>
-              <Input
-                value={title}
-                onChangeText={setTitle}
-                placeholder={t('notes.composer.placeholder')}
-                editable={!pending}
-                autoFocus={autoFocus}
-                returnKeyType="done"
-                onSubmitEditing={() => {
-                  void submit()
-                }}
-                accessibilityLabel={control.accessibilityLabel}
-                accessibilityHint={control.accessibilityHint}
-                invalid={control.invalid}
-                testID="note-composer-input"
-              />
-            </View>
-            <Button
-              label={pending ? t('notes.composer.pending') : t('notes.composer.submit')}
-              disabled={pending}
-              onPress={() => {
+    <Field label={t('notes.composer.label')} error={fieldError ?? undefined}>
+      {(control) => (
+        <View style={styles.row}>
+          <View style={styles.inputSlot}>
+            <Input
+              value={title}
+              onChangeText={setTitle}
+              placeholder={t('notes.composer.placeholder')}
+              editable={!pending}
+              autoFocus={autoFocus}
+              returnKeyType="done"
+              onSubmitEditing={() => {
                 void submit()
               }}
-              testID="note-composer-submit"
+              accessibilityLabel={control.accessibilityLabel}
+              accessibilityHint={control.accessibilityHint}
+              invalid={control.invalid}
+              testID="note-composer-input"
             />
           </View>
-        )}
-      </Field>
-    </KeyboardAvoidingView>
+          <Button
+            label={pending ? t('notes.composer.pending') : t('notes.composer.submit')}
+            disabled={pending}
+            onPress={() => {
+              void submit()
+            }}
+            testID="note-composer-submit"
+          />
+        </View>
+      )}
+    </Field>
   )
 }

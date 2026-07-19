@@ -36,7 +36,7 @@ export default function HomeScreen() {
     stampBootTiming()
   }, [])
   return (
-    <Screen testID="home-screen">
+    <Screen keyboard testID="home-screen">
       <View style={styles.header}>
         <AppText variant="title">{t('route.home')}</AppText>
         <Button

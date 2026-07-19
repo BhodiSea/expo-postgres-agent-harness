@@ -1,14 +1,15 @@
 import { type Note, NotesPage } from '@app/contracts'
-import { FlatList, View } from 'react-native'
+import { FlatList, RefreshControl, View } from 'react-native'
 import { AppText } from '../../components/AppText'
 import { Button } from '../../components/Button'
+import { Card } from '../../components/Card'
 import { EmptyState } from '../../components/EmptyState'
 import { Skeleton } from '../../components/Skeleton'
 import { useToast } from '../../components/Toast'
 import { formatRelativeTime, useI18n } from '../../i18n'
 import { apiFetch } from '../../lib/api-client'
 import { ROUTES } from '../../routes'
-import { type Palette, useThemedStyles } from '../../theme/theme'
+import { type Palette, usePalette, useThemedStyles } from '../../theme/theme'
 import { radius, spacing } from '../../theme/tokens.gen'
 import { NoteComposer } from './NoteComposer'
 import { type ComposerRow, useCreateNote } from './useCreateNote'
@@ -68,16 +69,6 @@ const panelStyles = (palette: Palette) => ({
   rowPending: {
     borderStyle: 'dashed' as const,
   },
-  errorBox: {
-    // border-danger, not border-edge: the failure surface must not be the same
-    // box as the empty state. The message text stays full-contrast ink — colour
-    // is the redundant channel, never the only one.
-    borderColor: palette.danger,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    gap: spacing * 2,
-    padding: spacing * 3,
-  },
 })
 
 function NoteRowItem({ row }: { readonly row: ComposerRow }) {
@@ -127,6 +118,7 @@ function NotesBody({
 }) {
   const { t } = useI18n()
   const styles = useThemedStyles(panelStyles)
+  const palette = usePalette()
   if (state.status === 'loading') {
     // Skeleton, not prose: the placeholder mirrors the note rows about to paint
     // (no layout shift on arrival) and announces itself as a progressbar. The
@@ -137,10 +129,10 @@ function NotesBody({
   if (state.status === 'error') {
     return (
       // The error testID must sit on a surface that CONTAINS the retry button
-      // (src/routes.ts contract), so it rides the box View — which is safe
-      // because the box is STYLED (border/padding): Fabric only flattens
-      // layout-only Views (design record: CI-LANE-FACTS).
-      <View style={styles.errorBox} testID={HOME.states.error}>
+      // (src/routes.ts contract), so it rides the Card — danger tone: the
+      // failure surface must not be the same box as the empty state, and the
+      // Card is styled, so Fabric keeps it (design record: CI-LANE-FACTS).
+      <Card tone="danger" testID={HOME.states.error}>
         {/* THREE registers, and the distinction is the point.
               1. WHAT failed — catalog copy, always the same sentence for this surface.
               2. WHY — also catalog copy, but SELECTED BY THE ENVELOPE'S `code`:
@@ -163,7 +155,7 @@ function NotesBody({
           </AppText>
         )}
         <Button variant="outline" label={t('common.retry')} onPress={onRetry} />
-      </View>
+      </Card>
     )
   }
   const items = state.status === 'ready' ? state.items : []
@@ -195,6 +187,20 @@ function NotesBody({
       renderItem={({ item }) => <NoteRowItem row={item} />}
       contentContainerStyle={styles.list}
       testID="notes-list"
+      // A tap on a row should land while the composer's keyboard is up — not
+      // spend itself dismissing the keyboard first.
+      keyboardShouldPersistTaps="handled"
+      // Pull-to-refresh re-runs the same reload as the header button; the body
+      // swaps to the skeleton, which IS the refresh indicator, so the control's
+      // own spinner never needs to persist (refreshing stays false).
+      refreshControl={
+        <RefreshControl
+          refreshing={false}
+          onRefresh={onRetry}
+          tintColor={palette['ink-muted']}
+          colors={[palette['ink-muted']]}
+        />
+      }
     />
   )
 }

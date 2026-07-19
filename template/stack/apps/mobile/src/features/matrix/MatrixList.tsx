@@ -1,7 +1,7 @@
-import { FlatList, View } from 'react-native'
+import { FlatList, RefreshControl, View } from 'react-native'
 import { AppText } from '../../components/AppText'
 import { formatCellValue, useI18n } from '../../i18n'
-import { type Palette, useThemedStyles } from '../../theme/theme'
+import { type Palette, usePalette, useThemedStyles } from '../../theme/theme'
 import { fontScaleCap, spacing, typeScale } from '../../theme/tokens.gen'
 import type { MatrixColumn, MatrixRow } from './matrixData'
 
@@ -44,6 +44,8 @@ interface MatrixListProps {
   readonly columns: readonly MatrixColumn[]
   /** Near-end scroll trigger — loadMore itself single-flights repeats. */
   readonly onEndReached: () => void
+  /** Pull-to-refresh — the screen's reload; the skeleton takes over as indicator. */
+  readonly onRefresh?: (() => void) | undefined
 }
 
 const listStyles = (palette: Palette) => ({
@@ -82,12 +84,23 @@ const listStyles = (palette: Palette) => ({
   },
 })
 
-export function MatrixList({ rows, columns, onEndReached }: MatrixListProps) {
+export function MatrixList({ rows, columns, onEndReached, onRefresh }: MatrixListProps) {
   const { t } = useI18n()
   const styles = useThemedStyles(listStyles)
+  const palette = usePalette()
   return (
     <FlatList
       testID="matrix-list"
+      refreshControl={
+        onRefresh === undefined ? undefined : (
+          <RefreshControl
+            refreshing={false}
+            onRefresh={onRefresh}
+            tintColor={palette['ink-muted']}
+            colors={[palette['ink-muted']]}
+          />
+        )
+      }
       accessibilityLabel={t('matrix.list')}
       // The pagination announcement (see the header comment): AT users must be
       // told the list grows at its end — the visual near-end trigger is silent.
