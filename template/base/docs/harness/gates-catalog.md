@@ -257,9 +257,29 @@ text held to its declared floor; a source scan of the mobile tree for hex/rgb
 color literals and rogue style vocabularies outside the generated module (lint's
 no-color-literals is the in-editor half); the launch-frame lockstep with
 app.config.ts shared with expo-policy.
+
+The DESIGN-DEPTH sub-checks (0.1.2), each content-conditional on its manifest
+key — keyless manifests self-disable with ONE combined adoption NOTE, malformed
+keys and stale seam/base paths fail closed: **motion discipline** (`motionSeam`)
+— literal `duration:`/`delay:` numerics red anywhere in the walk (the motion
+vocabulary lives in the `families.motion` tokens; 0 passes), and raw
+`Animated.`/`LayoutAnimation.`/`Easing.` references red outside the seam file +
+the components home with NO allow escape, because the seam's hooks
+(useEntrance/usePulse/usePressScale) carry both the token vocabulary and the
+reduce-motion collapse; **elevation keys** (`families.elevation`) — the
+`shadow*`/`elevation` style keys are spelled only inside the generated tokens
+module, consumers spread a level (`{ ...elevation.raised }`); **hit-target
+floor** (`families.sizing`) — a home file styling a raw control must reference
+`sizes.minTarget` in its own code, and with `controlPrimitives.base` declared
+the pressable-class tags may be styled in exactly ONE home file (the
+PressableScale touchable base — pressed feedback, the hit target, and the
+haptic live there).
 **Anti-vacuity:** darken a token below its pair's floor → FAIL printing the
 computed ratio; hand-edit tokens.gen.ts → FAIL regen-diff; add a hex literal to a
-component style → FAIL naming the file.
+component style → FAIL naming the file; write `duration: 250` in a feature →
+FAIL naming the literal; call `Animated.timing` from a screen → FAIL pointing at
+the seam; spell `shadowOpacity:` outside src/theme → FAIL; style a raw
+`<Pressable>` in a second home file → FAIL naming the base.
 
 ### 18. perf-budget — `node tools/check-perf-budget.mjs`
 

@@ -30,9 +30,15 @@ components. Check:
   ships no in-app `Image` yet — audit any diff that adds one.
 - **Touch target size (2.5.8)**: at least 44×44 pt (the platform HIG floor —
   WCAG's 24 px is an absolute minimum, not a target) or adequate spacing; check
-  `hitSlop` on small controls.
+  `hitSlop` on small controls. The floor is a TOKEN (`sizes.minTarget`) and the
+  styleguide gate requires any home file styling a raw control to reference it —
+  a control rendered through PressableScale/Input inherits it; flag anything
+  that undercuts the token with a smaller explicit height.
 - **Dynamic type (1.4.4)**: never `allowFontScaling={false}` and no fixed heights
   that clip text at large font scales — layouts must survive ~200% scaling.
+  Caps are tokens too (`fontScaleCap.default` 2 / `.dense` 1.3 for fixed-height
+  rows, applied by AppText): flag any cap below the dense token, and any
+  fixed-height surface whose text is uncapped.
 - **Announcements (4.1.3)**: async status changes (connection state, saves, stream
   progress, toasts) are announced — `accessibilityLiveRegion` (Android),
   `AccessibilityInfo.announceForAccessibility`, or the Toast primitive's built-in
@@ -48,7 +54,10 @@ components. Check:
   and interactive children must NOT be swallowed by an accessible parent.
 - **Reduced motion**: animations respect the OS reduce-motion setting
   (`AccessibilityInfo.isReduceMotionEnabled`) — a held loading state must not pulse
-  under reduced motion.
+  under reduced motion. The motion seam (`src/lib/motion.ts`) collapses its hooks
+  to static by construction and the styleguide gate bans raw Animated calls
+  outside it — so the thing to AUDIT is any motion that dodges the seam, and any
+  new seam hook that forgets the collapse.
 - **Colour contrast AA**: check the RESOLVED token values from
   `src/theme/tokens.gen.ts` in BOTH palettes, not the token names; body text holds
   AA (the styleguide manifest computes the committed pairs — flag any literal

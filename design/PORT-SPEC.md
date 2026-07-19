@@ -27,6 +27,14 @@ absent).
   `tools/styleguide.manifest.json` stays the OKLCH source of truth;
   `tools/gen-theme.mjs` emits committed sRGB tokens; the styleguide gate
   regen-diffs.
+- **Motion** (0.1.2): RN core `Animated` + manifest motion tokens
+  (`families.motion` — durations/easings/pressScale as data), consumed through
+  ONE seam (`src/lib/motion.ts`) whose hooks animate transform/opacity only
+  (native-driver whitelist) and collapse to static under OS reduce-motion by
+  construction. The styleguide gate bans raw `Animated`/`Easing`/
+  `LayoutAnimation` references outside the seam + the components home, and
+  literal `duration:`/`delay:` values everywhere — motion stays
+  tokens-as-data, exactly like color.
 - **Unit runners**: vitest (server, packages, pure mobile logic) + jest-expo
   (RN components/screens); diff-coverage merges both istanbul maps.
 - **Orchestrator**: GitHub Actions, SHA-pinned + harden-runner. No selftest
@@ -42,6 +50,12 @@ absent).
 - NativeWind / Unistyles — a compile layer (or a native styling runtime)
   between the styleguide manifest and the pixels defeats the tokens-as-data
   scannability the gate depends on.
+- react-native-reanimated — the same class for motion: a Babel transform plus
+  a native worklet runtime between the motion tokens and the pixels, when
+  everything this tier of motion needs (press scale, entrance fade/slide,
+  skeleton pulse) sits inside core `Animated`'s native-driver whitelist with
+  zero added dependencies. Revisit only for gesture-driven surfaces
+  (sheets/swipes), as an opt-in module.
 - Maestro-on-EAS for the base e2e lane — requires credentials and puts a cloud
   build ahead of every e2e signal; consumers can opt in via a module.
 - EAS Workflows as CI orchestrator — cannot be SHA-pinned, no harden-runner or
