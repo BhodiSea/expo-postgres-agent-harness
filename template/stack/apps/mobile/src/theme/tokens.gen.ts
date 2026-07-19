@@ -55,3 +55,52 @@ export const radius = {
 
 /** Spacing base unit (dp). Multiply it — never hand-write raw offsets. */
 export const spacing = 4
+
+/** Motion vocabulary: durations (ms), cubic-bezier easings, pressed-state scale. */
+export const motion = {
+  duration: {
+    base: 200,
+    fast: 120,
+    slow: 320,
+  },
+  easing: {
+    accelerate: [0.3, 0, 1, 1],
+    decelerate: [0, 0, 0.2, 1],
+    standard: [0.2, 0, 0, 1],
+  },
+  pressScale: 0.97,
+} as const
+
+/** Elevation levels — spread one onto a surface style ({ ...elevation.raised }). */
+export const elevation = {
+  overlay: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  raised: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.18,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+} as const
+
+/** Structural sizes (dp): the minimum hit target and the closed icon scale. */
+export const sizes = {
+  icon: {
+    lg: 24,
+    md: 20,
+    sm: 16,
+  },
+  minTarget: 44,
+} as const
+
+/** maxFontSizeMultiplier caps: OS font scaling is honored up to these factors. */
+export const fontScaleCap = {
+  default: 2,
+  dense: 1.3,
+} as const

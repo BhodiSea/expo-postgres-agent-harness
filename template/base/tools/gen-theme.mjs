@@ -9,6 +9,12 @@
 // order comes from the manifest's canonical `tokens` array, family keys are sorted,
 // formatting is fixed) so the styleguide gate can regen-diff the committed file.
 //
+// The motion/elevation/sizing/fontScaleCap families are OPTIONAL and content-
+// conditional: the manifest is SEEDED (update never rewrites it), so each block is
+// emitted only when its family is declared — an older manifest renders byte-
+// identically — and a present-but-malformed family THROWS (fail-closed): silently
+// skipping a typo'd family would ship a module missing tokens the components expect.
+//
 // An out-of-gamut OKLCH token is a hard FAIL, never a silent clamp: the platform
 // would gamut-map it on screen, so every computed contrast number would describe a
 // color nobody sees. Retune the manifest value instead.
@@ -71,6 +77,134 @@ export function assertContrast(manifest) {
   }
 }
 
+const isFiniteNumber = (n) => typeof n === 'number' && Number.isFinite(n)
+const isPositiveNumber = (n) => isFiniteNumber(n) && n > 0
+const isNonEmptyNumberMap = (obj, valueOk) =>
+  obj !== null &&
+  typeof obj === 'object' &&
+  !Array.isArray(obj) &&
+  Object.keys(obj).length > 0 &&
+  Object.values(obj).every(valueOk)
+
+// A CSS cubic-bezier control quad: [x1, y1, x2, y2] with both x coordinates in
+// [0, 1] (time never runs backwards); y may overshoot for spring-like curves.
+// SOURCE: CSS Easing Functions Level 1 cubic-bezier() input-progress constraint
+// https://www.w3.org/TR/css-easing-1/#cubic-bezier-easing-functions
+const isBezierQuad = (e) =>
+  Array.isArray(e) &&
+  e.length === 4 &&
+  e.every(isFiniteNumber) &&
+  e[0] >= 0 &&
+  e[0] <= 1 &&
+  e[2] >= 0 &&
+  e[2] <= 1
+
+function emitMotion(lines, motion) {
+  if (motion === undefined) return
+  const ok =
+    motion !== null &&
+    typeof motion === 'object' &&
+    isNonEmptyNumberMap(motion.duration, isPositiveNumber) &&
+    isNonEmptyNumberMap(motion.easing, isBezierQuad) &&
+    isPositiveNumber(motion.pressScale) &&
+    motion.pressScale <= 1
+  if (!ok) {
+    throw new Error(
+      `families.motion must be { "duration": { <role>: positive ms }, "easing": { <role>: [x1,y1,x2,y2] with x1/x2 in [0,1] }, "pressScale": number in (0,1] } — got ${JSON.stringify(motion)}`,
+    )
+  }
+  lines.push(
+    '/** Motion vocabulary: durations (ms), cubic-bezier easings, pressed-state scale. */',
+    'export const motion = {',
+    '  duration: {',
+  )
+  for (const k of Object.keys(motion.duration).sort()) {
+    lines.push(`    ${tsKey(k)}: ${motion.duration[k]},`)
+  }
+  lines.push('  },', '  easing: {')
+  for (const k of Object.keys(motion.easing).sort()) {
+    lines.push(`    ${tsKey(k)}: [${motion.easing[k].join(', ')}],`)
+  }
+  lines.push('  },', `  pressScale: ${motion.pressScale},`, '} as const', '')
+}
+
+function emitElevation(lines, elevation) {
+  if (elevation === undefined) return
+  const levelOk = (l) =>
+    l !== null &&
+    typeof l === 'object' &&
+    isFiniteNumber(l.offsetY) &&
+    isFiniteNumber(l.blur) &&
+    l.blur >= 0 &&
+    isFiniteNumber(l.opacity) &&
+    l.opacity >= 0 &&
+    l.opacity <= 1 &&
+    Number.isInteger(l.android) &&
+    l.android >= 0
+  if (!isNonEmptyNumberMap(elevation, levelOk)) {
+    throw new Error(
+      `families.elevation must be { <level>: { "offsetY": number, "blur": number >= 0, "opacity": number in [0,1], "android": integer >= 0 } } — got ${JSON.stringify(elevation)}`,
+    )
+  }
+  lines.push(
+    '/** Elevation levels — spread one onto a surface style ({ ...elevation.raised }). */',
+    'export const elevation = {',
+  )
+  for (const k of Object.keys(elevation).sort()) {
+    const l = elevation[k]
+    lines.push(
+      `  ${tsKey(k)}: {`,
+      "    shadowColor: '#000000',",
+      `    shadowOffset: { width: 0, height: ${l.offsetY} },`,
+      `    shadowOpacity: ${l.opacity},`,
+      `    shadowRadius: ${l.blur},`,
+      `    elevation: ${l.android},`,
+      '  },',
+    )
+  }
+  lines.push('} as const', '')
+}
+
+function emitSizing(lines, sizing) {
+  if (sizing === undefined) return
+  const ok =
+    sizing !== null &&
+    typeof sizing === 'object' &&
+    isPositiveNumber(sizing.minTarget) &&
+    isNonEmptyNumberMap(sizing.icon, isPositiveNumber)
+  if (!ok) {
+    throw new Error(
+      `families.sizing must be { "minTarget": positive dp, "icon": { <size>: positive dp } } — got ${JSON.stringify(sizing)}`,
+    )
+  }
+  lines.push(
+    '/** Structural sizes (dp): the minimum hit target and the closed icon scale. */',
+    'export const sizes = {',
+    '  icon: {',
+  )
+  for (const k of Object.keys(sizing.icon).sort()) {
+    lines.push(`    ${tsKey(k)}: ${sizing.icon[k]},`)
+  }
+  lines.push('  },', `  minTarget: ${sizing.minTarget},`, '} as const', '')
+}
+
+function emitFontScaleCap(lines, caps) {
+  if (caps === undefined) return
+  if (!isNonEmptyNumberMap(caps, (n) => isFiniteNumber(n) && n >= 1)) {
+    throw new Error(
+      `families.fontScaleCap must be { <role>: number >= 1 } — got ${JSON.stringify(caps)}`,
+    )
+  }
+  lines.push(
+    '/** maxFontSizeMultiplier caps: OS font scaling is honored up to these factors. */',
+    'export const fontScaleCap = {',
+  )
+  for (const k of Object.keys(caps).sort()) {
+    lines.push(`  ${tsKey(k)}: ${caps[k]},`)
+  }
+  lines.push('} as const', '')
+}
+
 export function renderTokensModule(manifest) {
   assertContrast(manifest)
   const themeNames = Object.keys(manifest.themes).sort()
@@ -129,6 +263,12 @@ export function renderTokensModule(manifest) {
     `export const spacing = ${families.spacing.unit}`,
     '',
   )
+  // Optional, content-conditional families — fixed emission order; absent keys
+  // emit nothing so an older seeded manifest renders byte-identically.
+  emitMotion(lines, families.motion)
+  emitElevation(lines, families.elevation)
+  emitSizing(lines, families.sizing)
+  emitFontScaleCap(lines, families.fontScaleCap)
   return lines.join('\n')
 }
 

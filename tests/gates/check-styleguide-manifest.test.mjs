@@ -125,6 +125,68 @@ test('RED: an out-of-gamut OKLCH token is contrast-unverifiable', () => {
   assert.ok(r.out.includes('unverifiable'), r.out)
 })
 
+// ---- 1b: optional families (motion / elevation / sizing / fontScaleCap) ----------
+// Content-conditional like controlPrimitives: absent families emit nothing (an
+// older seeded manifest renders byte-identically), present-but-malformed families
+// THROW in the generator, which the gate surfaces through the regen-diff spawn.
+
+test('the shipped manifest declares the optional families and the module carries their blocks', () => {
+  const m = JSON.parse(SHIPPED_MANIFEST)
+  for (const family of ['motion', 'elevation', 'sizing', 'fontScaleCap']) {
+    assert.ok(m.families[family] !== undefined, `families.${family} missing from shipped manifest`)
+  }
+  for (const block of ['export const motion', 'export const elevation', 'export const sizes', 'export const fontScaleCap']) {
+    assert.ok(SHIPPED_TOKENS.includes(block), `${block} missing from shipped tokens module`)
+  }
+})
+
+test('GREEN backward-compat: a manifest WITHOUT the optional families renders the legacy module shape', () => {
+  const m = withManifest((man) => {
+    delete man.families.motion
+    delete man.families.elevation
+    delete man.families.sizing
+    delete man.families.fontScaleCap
+  })
+  const rendered = renderTokensModule(m)
+  assert.ok(!rendered.includes('export const motion'), 'motion must not emit without its family')
+  assert.ok(!rendered.includes('export const elevation'), 'elevation must not emit without its family')
+  assert.ok(rendered.endsWith('export const spacing = 4\n'), 'legacy module must still end at spacing')
+  const r = runGate(fixture({ manifest: m, tokensModule: rendered }))
+  assert.equal(r.code, 0, r.out)
+})
+
+test('RED: a present-but-malformed optional family FAILS CLOSED (generator throws, gate reds)', () => {
+  const badMotion = runGate(
+    fixture({ manifest: withManifest((m) => (m.families.motion.pressScale = 0)) }),
+  )
+  assert.equal(badMotion.code, 1, badMotion.out)
+  assert.ok(badMotion.out.includes('families.motion must be'), badMotion.out)
+
+  const badEasing = runGate(
+    fixture({ manifest: withManifest((m) => (m.families.motion.easing.standard = [2, 0, 0, 1])) }),
+  )
+  assert.equal(badEasing.code, 1, badEasing.out)
+  assert.ok(badEasing.out.includes('families.motion must be'), badEasing.out)
+
+  const badElevation = runGate(
+    fixture({ manifest: withManifest((m) => (m.families.elevation.raised.opacity = 1.5)) }),
+  )
+  assert.equal(badElevation.code, 1, badElevation.out)
+  assert.ok(badElevation.out.includes('families.elevation must be'), badElevation.out)
+
+  const badSizing = runGate(
+    fixture({ manifest: withManifest((m) => (m.families.sizing.minTarget = -1)) }),
+  )
+  assert.equal(badSizing.code, 1, badSizing.out)
+  assert.ok(badSizing.out.includes('families.sizing must be'), badSizing.out)
+
+  const badCap = runGate(
+    fixture({ manifest: withManifest((m) => (m.families.fontScaleCap.dense = 0.5)) }),
+  )
+  assert.equal(badCap.code, 1, badCap.out)
+  assert.ok(badCap.out.includes('families.fontScaleCap must be'), badCap.out)
+})
+
 // ---- 2: regen-diff --------------------------------------------------------------
 
 test('RED: a hand-edited tokens.gen.ts is a regen-diff drift, not a design change', () => {
