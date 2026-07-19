@@ -211,6 +211,23 @@ describe('haptics wiring — the closed vocabulary', () => {
   })
 })
 
+describe('Icon — decorative by construction', () => {
+  it('the toast tone glyph is hidden from assistive tech; the message stays the meaning', () => {
+    render(
+      <ToastProvider>
+        <ToastTrigger message="Iconed failure" tone="error" />
+      </ToastProvider>,
+    )
+    fireEvent.press(screen.getByTestId('toast-trigger'))
+    // RNTL's default queries see what assistive tech sees — the glyph must be
+    // INVISIBLE there, and present only to the hidden-inclusive query.
+    expect(screen.queryByTestId('toast-icon-error')).toBeNull()
+    const icon = screen.getByTestId('toast-icon-error', { includeHiddenElements: true })
+    expect(icon.props['accessibilityElementsHidden'] as boolean).toBe(true)
+    expect(screen.getByTestId('toast-error')).toHaveTextContent('Iconed failure')
+  })
+})
+
 describe('AppText font scaling', () => {
   it('caps OS font scaling at the default cap; an explicit dense cap wins', () => {
     render(<AppText testID="cap-default">scaled</AppText>)

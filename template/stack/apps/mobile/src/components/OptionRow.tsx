@@ -1,6 +1,7 @@
 import { type Palette, useThemedStyles } from '../theme/theme'
 import { radius, spacing } from '../theme/tokens.gen'
 import { AppText } from './AppText'
+import { Icon } from './icons/Icon'
 import { PressableScale } from './PressableScale'
 
 // The selectable-row primitive: one pressable option in a picker surface (the
@@ -21,10 +22,14 @@ interface OptionRowProps {
 
 const optionRowStyles = (palette: Palette) => ({
   row: {
+    alignItems: 'center' as const,
     backgroundColor: palette.canvas,
     borderColor: palette.edge,
     borderRadius: radius.sm,
     borderWidth: 1,
+    flexDirection: 'row' as const,
+    gap: spacing * 2,
+    justifyContent: 'space-between' as const,
     paddingHorizontal: spacing * 3,
     paddingVertical: spacing * 2,
   },
@@ -42,6 +47,9 @@ export function OptionRow({ label, onPress, accessibilityHint, testID }: OptionR
       style={styles.row}
     >
       <AppText>{label}</AppText>
+      {/* The trailing chevron is the "this row goes somewhere" affordance —
+          decorative by Icon's construction; the label stays the whole name. */}
+      <Icon name="chevronRight" size="sm" />
     </PressableScale>
   )
 }

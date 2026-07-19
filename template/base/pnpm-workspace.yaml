@@ -100,6 +100,7 @@ catalog:
   react-native: 0.86.0
   react-native-safe-area-context: ~5.7.0
   react-native-screens: 4.25.2 # exact: bundledNativeModules pins it exact
+  react-native-svg: 15.15.4 # exact: bundledNativeModules pins it exact; one-door'd to src/components/icons (the closed glyph set)
   # jest-expo 57 is a jest-29 preset (its babel-jest/@jest/* internals are ^29);
   # jest 30 would split the runner and the preset internals across majors.
   jest: ~29.7.0

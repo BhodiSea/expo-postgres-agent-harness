@@ -130,9 +130,10 @@ export default tseslint.config(
     // enforces the same wall on the resolved module graph — lint catches it at
     // the write, architecture at validate.
     // The haptics engine has ONE door too: src/lib/haptics.ts (the closed
-    // selection/success/warning vocabulary) — both seams share this block, so
-    // each seam file is exempt from the other's ban only through the module
-    // graph rules depcruise owns.
+    // selection/success/warning vocabulary), and svg primitives a third:
+    // src/components/icons (the closed glyph set) — the seams share this
+    // block, so each seam file is exempt from the others' bans only through
+    // the module-graph rules depcruise owns.
     files: ['apps/mobile/**/*.ts', 'apps/mobile/**/*.tsx'],
     // haptics.test.ts sits beside the seam: proving the engine mapping requires
     // mocking the engine, which requires importing it.
@@ -140,6 +141,7 @@ export default tseslint.config(
       'apps/mobile/src/host/**',
       'apps/mobile/src/lib/haptics.ts',
       'apps/mobile/src/lib/haptics.test.ts',
+      'apps/mobile/src/components/icons/**',
     ],
     rules: {
       'no-restricted-imports': [
@@ -155,6 +157,11 @@ export default tseslint.config(
               group: ['expo-haptics', 'expo-haptics/*'],
               message:
                 'Haptics have one door: call haptic() from src/lib/haptics.ts — the closed selection/success/warning vocabulary keeps tactile feedback consistent app-wide.',
+            },
+            {
+              group: ['react-native-svg', 'react-native-svg/*'],
+              message:
+                'Svg primitives have one door: render a named glyph through src/components/icons/Icon.tsx — the closed set keeps iconography one idiom; new glyphs are added there in review.',
             },
           ],
         },
@@ -194,6 +201,11 @@ export default tseslint.config(
               group: ['expo-haptics', 'expo-haptics/*'],
               message:
                 'Haptics have one door: call haptic() from src/lib/haptics.ts — the closed selection/success/warning vocabulary keeps tactile feedback consistent app-wide.',
+            },
+            {
+              group: ['react-native-svg', 'react-native-svg/*'],
+              message:
+                'Svg primitives have one door: render a named glyph through src/components/icons/Icon.tsx — the closed set keeps iconography one idiom; new glyphs are added there in review.',
             },
           ],
         },

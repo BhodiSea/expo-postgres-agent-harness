@@ -7,6 +7,7 @@ import { type Palette, useThemedStyles } from '../theme/theme'
 import { elevation, radius, spacing } from '../theme/tokens.gen'
 import { AppText } from './AppText'
 import { Button } from './Button'
+import { Icon } from './icons/Icon'
 
 // SOURCE: WCAG 2.2 SC 4.1.3 Status Messages — a toast is a status message that
 // must reach assistive tech without moving focus; the auto-dismiss delay holds
@@ -91,6 +92,14 @@ const toastStyles = (palette: Palette) => ({
 // card fades in while sliding up through the motion seam (reduce-motion renders
 // it at rest on frame one). The ANNOUNCEMENT never rides this animation — show()
 // announces synchronously, before any frame is painted.
+// The tone's glyph doubles the border's colour channel — never replaces the
+// text (decorative by Icon's construction; the message carries the meaning).
+const TONE_ICON = {
+  info: { name: 'info', tone: 'ink-muted' },
+  error: { name: 'alertTriangle', tone: 'danger' },
+  success: { name: 'checkCircle', tone: 'success' },
+} as const
+
 function ToastCard({
   toast,
   onDismiss,
@@ -110,6 +119,12 @@ function ToastCard({
         entrance,
       ]}
     >
+      <Icon
+        name={TONE_ICON[toast.tone].name}
+        tone={TONE_ICON[toast.tone].tone}
+        size="sm"
+        testID={`toast-icon-${toast.tone}`}
+      />
       <AppText
         testID={`toast-${toast.tone}`}
         // Android's native live region announces the appearance; an error
