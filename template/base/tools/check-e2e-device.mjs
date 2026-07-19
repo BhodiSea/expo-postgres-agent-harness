@@ -192,13 +192,27 @@ if (phase === 'flows') {
   }
   const journeyFile = join(outDir, 'perf-harness.yaml')
   writeFileSync(journeyFile, buildPerfHarnessYaml(identity, budgets))
+  // COLD-START by construction: force-stop first, so the deep link always takes
+  // the initial-URL path into a FRESH process that fetches the current bundle
+  // and measures exactly once. A warm delivery re-lands on an already-mounted
+  // /perf-harness whose verdict is state from an EARLIER measurement — proven
+  // live: after a canary's source revert, the restored run displayed the
+  // stalled run's exact perf-fail metrics because nothing had remounted the
+  // screen; whether a dev-client reload re-measures depends on HMR push
+  // semantics this runner must not depend on.
+  const stop = sh(`adb shell am force-stop ${quoted(identity.appId)}`)
+  if (stop.status !== 0) {
+    fail(
+      GATE,
+      `force-stop before the perf launch failed (exit ${String(stop.status)}): ${String(stop.stderr ?? '').slice(0, 400)}`,
+    )
+  }
   // The runner delivers the deep link itself: this is the one link with a query
   // string, and Maestro's openLink passes the URL through the device shell
   // unquoted — it splits at the first '&' and the intent never fires (proven
   // live: openLink reported COMPLETED while the hierarchy showed Home). The
   // inner single quotes survive `adb shell` onto the device shell, so the full
-  // data string reaches `am start`; the app launches cold (initial-URL path) or
-  // navigates warm (onNewIntent) — both land on /perf-harness.
+  // data string reaches `am start`.
   const url = perfHarnessUrl(identity, budgets)
   const nav = sh(`adb shell "am start -W -a android.intent.action.VIEW -d '${url}'"`)
   if (nav.status !== 0) {

@@ -203,6 +203,12 @@ test('--phase perf-harness: assert-only journey; the FULL query-string link is d
     ),
     invocations,
   )
+  // Cold-start discipline: the phase must force-stop BEFORE delivering the link
+  // (a warm re-delivery shows an earlier measurement's verdict — proven live).
+  const stopAt = invocations.indexOf('am force-stop')
+  const startAt = invocations.indexOf('am start -W')
+  assert.ok(stopAt !== -1, invocations)
+  assert.ok(stopAt < startAt, `force-stop must precede am start:\n${invocations}`)
 })
 
 test('RED --phase perf-harness: a malformed budget file fails closed, never relaxes', () => {
