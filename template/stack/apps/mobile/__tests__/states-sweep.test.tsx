@@ -64,10 +64,14 @@ const NETWORK_ROUTES = [HOME, MATRIX] as const
 describe.each(
   NETWORK_ROUTES.map((route) => [route.id, route] as const),
 )('route %s canonical states', (_id, route) => {
-  it(`held query renders ${route.states.loading}`, async () => {
+  it(`held query renders ${route.states.loading} as a progressbar skeleton, never prose`, async () => {
     installFor('held')
     renderRouter('./app', { initialUrl: route.path })
-    expect(await screen.findByTestId(route.states.loading)).toBeTruthy()
+    const loading = await screen.findByTestId(route.states.loading)
+    // The loading surface is a Skeleton/Spinner (announced progressbar with the
+    // catalog's loading copy) — a bare "Loading…" text line reds here.
+    expect(loading.props['accessibilityRole'] as string).toBe('progressbar')
+    expect(loading.props['accessibilityLabel'] as string).toBe(en['common.loading'])
   })
 
   it(`zero items render ${route.states.empty}`, async () => {

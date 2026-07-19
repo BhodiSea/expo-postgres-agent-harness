@@ -3,6 +3,8 @@ import { AppText } from '../../src/components/AppText'
 import { Button } from '../../src/components/Button'
 import { EmptyState } from '../../src/components/EmptyState'
 import { Screen } from '../../src/components/Screen'
+import { Skeleton } from '../../src/components/Skeleton'
+import { Spinner } from '../../src/components/Spinner'
 import { useToast } from '../../src/components/Toast'
 import { MatrixList } from '../../src/features/matrix/MatrixList'
 import { MATRIX_COLUMNS, notesToMatrixRows } from '../../src/features/matrix/matrixData'
@@ -52,11 +54,10 @@ export default function MatrixScreen() {
     <Screen testID="matrix-screen">
       <AppText variant="title">{t('matrix.heading')}</AppText>
       {state.status === 'loading' && (
-        // testID on the Text LEAF — Fabric flattens plain wrapper Views and can
-        // detach their testIDs on device (design record: CI-LANE-FACTS).
-        <AppText variant="muted" testID={MATRIX.states.loading}>
-          {t('common.loading')}
-        </AppText>
+        // Skeleton, not prose: six placeholder lines approximate the dense list
+        // about to paint. The state testID rides the skeleton's accessible
+        // container (design record: CI-LANE-FACTS).
+        <Skeleton lines={6} testID={MATRIX.states.loading} />
       )}
       {state.status === 'empty' && (
         <EmptyState
@@ -109,12 +110,17 @@ export default function MatrixScreen() {
             </View>
           )}
           {state.cursor !== null && (
-            <Button
-              label={state.loadingMore ? t('matrix.loadingMore') : t('matrix.loadMore')}
-              disabled={state.loadingMore}
-              onPress={loadMore}
-              testID="matrix-load-more"
-            />
+            <View style={styles.loadMoreRow}>
+              <Button
+                label={state.loadingMore ? t('matrix.loadingMore') : t('matrix.loadMore')}
+                disabled={state.loadingMore}
+                onPress={loadMore}
+                testID="matrix-load-more"
+              />
+              {/* The in-flight page fetch gets a visible pulse next to the
+                  disabled control — the label alone reads as a frozen button. */}
+              {state.loadingMore && <Spinner testID="matrix-load-more-busy" />}
+            </View>
           )}
         </>
       )}

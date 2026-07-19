@@ -1,8 +1,9 @@
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react'
-import { AccessibilityInfo, View } from 'react-native'
+import { AccessibilityInfo, Animated, View } from 'react-native'
 import { useI18n } from '../i18n'
+import { useEntrance } from '../lib/motion'
 import { type Palette, useThemedStyles } from '../theme/theme'
-import { radius, spacing } from '../theme/tokens.gen'
+import { elevation, radius, spacing } from '../theme/tokens.gen'
 import { AppText } from './AppText'
 import { Button } from './Button'
 
@@ -58,7 +59,11 @@ const toastStyles = (palette: Palette) => ({
     position: 'absolute' as const,
     right: 0,
   },
+  // A toast floats OVER the screen — the overlay elevation level is what
+  // separates it from the surface it interrupts (the border alone reads as
+  // just another card in dark themes).
   toast: {
+    ...elevation.overlay,
     alignItems: 'center' as const,
     backgroundColor: palette.surface,
     borderColor: palette.edge,
@@ -81,14 +86,56 @@ const toastStyles = (palette: Palette) => ({
   },
 })
 
+// One card per queued toast, split out so the entrance hook runs per-toast: each
+// card fades in while sliding up through the motion seam (reduce-motion renders
+// it at rest on frame one). The ANNOUNCEMENT never rides this animation — show()
+// announces synchronously, before any frame is painted.
+function ToastCard({
+  toast,
+  onDismiss,
+}: {
+  readonly toast: ToastItem
+  readonly onDismiss: (id: number) => void
+}) {
+  const { t } = useI18n()
+  const styles = useThemedStyles(toastStyles)
+  const entrance = useEntrance()
+  return (
+    <Animated.View
+      style={[
+        styles.toast,
+        toast.tone === 'error' && styles.error,
+        toast.tone === 'success' && styles.success,
+        entrance,
+      ]}
+    >
+      <AppText
+        testID={`toast-${toast.tone}`}
+        // Android's native live region announces the appearance; an error
+        // interrupts (assertive) — "your write was lost" must not queue
+        // politely behind chrome chatter. iOS parity is the explicit
+        // announceForAccessibility call in show().
+        accessibilityLiveRegion={toast.tone === 'error' ? 'assertive' : 'polite'}
+        style={styles.message}
+      >
+        {toast.message}
+      </AppText>
+      <Button
+        variant="ghost"
+        label={t('common.dismiss')}
+        testID={`toast-dismiss-${String(toast.id)}`}
+        onPress={() => {
+          onDismiss(toast.id)
+        }}
+      />
+    </Animated.View>
+  )
+}
+
 // Provider + queue + the rendered stack, all in ONE module so the surface stays a
 // single self-contained unit (the desktop original's shape, minus the DOM live
 // region — announceForAccessibility is the cross-platform announcement channel).
 export function ToastProvider({ children }: { readonly children: ReactNode }) {
-  // The toast MESSAGE is caller-supplied and already translated at its call site
-  // (it is arbitrary runtime copy, so it cannot be a catalog key here); the
-  // dismiss control's accessible name is ours, and comes from the catalog.
-  const { t } = useI18n()
   const styles = useThemedStyles(toastStyles)
   const [toasts, setToasts] = useState<readonly ToastItem[]>([])
   const nextId = useRef(0)
@@ -136,37 +183,10 @@ export function ToastProvider({ children }: { readonly children: ReactNode }) {
       {children}
       <View pointerEvents="box-none" style={styles.stack}>
         {toasts.map((toast) => (
-          // The card View is STYLED (border/background/padding), so Fabric never
+          // The card is STYLED (border/background/padding), so Fabric never
           // flattens it — but the testID still rides the message Text (an
           // accessible LEAF), per the leaf-testID rule (design record: CI-LANE-FACTS).
-          <View
-            key={toast.id}
-            style={[
-              styles.toast,
-              toast.tone === 'error' && styles.error,
-              toast.tone === 'success' && styles.success,
-            ]}
-          >
-            <AppText
-              testID={`toast-${toast.tone}`}
-              // Android's native live region announces the appearance; an error
-              // interrupts (assertive) — "your write was lost" must not queue
-              // politely behind chrome chatter. iOS parity is the explicit
-              // announceForAccessibility call in show().
-              accessibilityLiveRegion={toast.tone === 'error' ? 'assertive' : 'polite'}
-              style={styles.message}
-            >
-              {toast.message}
-            </AppText>
-            <Button
-              variant="ghost"
-              label={t('common.dismiss')}
-              testID={`toast-dismiss-${String(toast.id)}`}
-              onPress={() => {
-                dismiss(toast.id)
-              }}
-            />
-          </View>
+          <ToastCard key={toast.id} toast={toast} onDismiss={dismiss} />
         ))}
       </View>
     </ToastContext.Provider>

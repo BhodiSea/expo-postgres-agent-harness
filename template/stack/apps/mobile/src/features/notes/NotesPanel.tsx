@@ -3,6 +3,7 @@ import { FlatList, View } from 'react-native'
 import { AppText } from '../../components/AppText'
 import { Button } from '../../components/Button'
 import { EmptyState } from '../../components/EmptyState'
+import { Skeleton } from '../../components/Skeleton'
 import { useToast } from '../../components/Toast'
 import { formatRelativeTime, useI18n } from '../../i18n'
 import { apiFetch } from '../../lib/api-client'
@@ -127,14 +128,11 @@ function NotesBody({
   const { t } = useI18n()
   const styles = useThemedStyles(panelStyles)
   if (state.status === 'loading') {
-    // testID on the Text LEAF (accessible element), never a bare wrapper View —
-    // Fabric flattens layout-only Views and can detach their testIDs on device
-    // (design record: CI-LANE-FACTS).
-    return (
-      <AppText variant="muted" testID={HOME.states.loading}>
-        {t('common.loading')}
-      </AppText>
-    )
+    // Skeleton, not prose: the placeholder mirrors the note rows about to paint
+    // (no layout shift on arrival) and announces itself as a progressbar. The
+    // state testID rides its accessible container — Fabric keeps accessible
+    // elements intact (design record: CI-LANE-FACTS).
+    return <Skeleton testID={HOME.states.loading} />
   }
   if (state.status === 'error') {
     return (
