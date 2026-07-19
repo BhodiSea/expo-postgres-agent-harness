@@ -18,13 +18,46 @@ adb uninstall "$appid"
 adb install apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
 adb reverse tcp:8081 tcp:8081
 adb reverse tcp:8787 tcp:8787
-CI=1 EXPO_PUBLIC_API_ORIGIN=http://127.0.0.1:8787 \
-  pnpm --filter mobile exec expo start --port 8081 > /tmp/metro.log 2>&1 &
+# Metro must run in WATCH mode: Canaries 19/20 edit source on the runner and
+# assert the DEVICE sees it, and Metro under CI=true disables the file watcher
+# outright ("Metro is running in CI mode, reloads are disabled" — dispatch #6,
+# where the C19 device sweep passed against the stale clean bundle and the
+# canary correctly called the lane decoration). GitHub exports CI=true
+# job-wide, so strip it (and GITHUB_ACTIONS, which ci-info also matches) for
+# the Metro process alone; watch mode over a pnpm monorepo needs inotify
+# headroom the runner default may not have.
+sudo sysctl -q fs.inotify.max_user_watches=524288 fs.inotify.max_user_instances=1024 || true
+env -u CI -u GITHUB_ACTIONS EXPO_PUBLIC_API_ORIGIN=http://127.0.0.1:8787 \
+  pnpm --filter mobile exec expo start --port 8081 < /dev/null > /tmp/metro.log 2>&1 &
 for _ in $(seq 1 60); do
   if curl -fsS -m 2 "http://127.0.0.1:8081/status" > /dev/null; then break; fi
   sleep 2
 done
-curl -fsS -m 600 "http://127.0.0.1:8081/index.bundle?platform=android&dev=true" -o /dev/null || true
+# Prewarm the REAL bundle URL, fail-loud: debug builds request the Expo virtual
+# entry — /index.bundle 404s on this SDK (dispatch #6 log; re-proven against a
+# local Metro). This same URL is the canaries' premise probe below, so a dead
+# URL here would make those asserts vacuous — no `|| true`.
+bundle_url="http://127.0.0.1:8081/.expo/.virtual-metro-entry.bundle?platform=android&dev=true"
+curl -fsS -m 600 "$bundle_url" -o /dev/null
+
+# ASSERT (never assume) the edit-reaches-device premise: poll the Metro-served
+# bundle until the injected marker is present — or gone again after a revert.
+# Curl to a file, then grep: `curl | grep -q` under pipefail turns an early
+# grep match into a curl SIGPIPE failure and the condition lies.
+await_bundle() { # <present|absent> <marker> <leg>
+  mode="$1"; marker="$2"; leg="$3"
+  for _ in $(seq 1 30); do
+    if curl -fsS -m 120 -o /tmp/bundle-probe.js "$bundle_url"; then
+      case "$mode" in
+        present) if grep -q "$marker" /tmp/bundle-probe.js; then return 0; fi ;;
+        absent) if ! grep -q "$marker" /tmp/bundle-probe.js; then return 0; fi ;;
+      esac
+    fi
+    sleep 2
+  done
+  echo "::error::${leg}: the served bundle never went ${mode} for marker '${marker}' — the edit-reaches-device premise broke (watch mode dead? see /tmp/metro.log)"
+  return 1
+}
 
 # i18n/RTL: pre-seed the kv store BEFORE launch (locale ar-XB + theme
 # light) via run-as on the debuggable build — never an in-run switch.
@@ -52,6 +85,7 @@ node -e '
   if (!s.includes("testID=\"home-screen\"")) { console.error("::error::canary injection did not apply — home-screen testID moved"); process.exit(1); }
   fs.writeFileSync(f, s.replace("testID=\"home-screen\"", "testID=\"home-screen-broken\""));
 '
+await_bundle present 'home-screen-broken' 'CANARY 19'
 # Half one: the agent-time chain is BLIND to this (no jest test asserts
 # the home container id) — that blindness is the honest loss the device
 # lane exists to cover, asserted, not assumed.
@@ -72,6 +106,7 @@ if ! grep -Eq 'home-screen|FAILED' c19-device.log; then
   exit 1
 fi
 git checkout -q -- 'apps/mobile/app/(tabs)/index.tsx'
+await_bundle absent 'home-screen-broken' 'CANARY 19 (revert)'
 echo 'canary OK: jest lane green, device sweep red — the on-device floor is real'
 
 # Canary 20: a 300ms busy-loop on the actions ranking path → the perf-harness marker must go RED
@@ -85,6 +120,9 @@ node -e '
   s = s.replace(anchor, "  const blockUntil = globalThis.performance.now() + 300\n  while (globalThis.performance.now() < blockUntil) {\n    // selftest perf canary: stall the ranking path 300ms per call\n  }\n" + anchor);
   fs.writeFileSync(f, s);
 '
+# `blockUntil` (an identifier, not the comment — Babel strips comments) is the
+# marker; dev bundles are unminified so it survives verbatim.
+await_bundle present 'blockUntil' 'CANARY 20'
 if node tools/check-e2e-device.mjs --phase perf-harness --out-dir artifacts/maestro/c20 > c20.log 2>&1; then
   cat c20.log
   echo '::error::CANARY 20: the perf marker PASSED with a 300ms stall on every ranking call — the interaction floor cannot fail, so it is decoration'
@@ -92,6 +130,7 @@ if node tools/check-e2e-device.mjs --phase perf-harness --out-dir artifacts/maes
 fi
 grep -E 'perf-pass|FAILED|Assertion' c20.log | tail -n 5 || true
 git checkout -q -- apps/mobile/src/features/actions/fuzzyScore.ts
+await_bundle absent 'blockUntil' 'CANARY 20 (revert)'
 # Restore sanity: the marker is green again on clean source.
 node tools/check-e2e-device.mjs --phase perf-harness --out-dir artifacts/maestro/perf-restored
 echo 'canary OK: the perf marker went red under the stall and green again after the revert'
