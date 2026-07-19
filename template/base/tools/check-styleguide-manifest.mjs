@@ -66,6 +66,23 @@
 //       or an AppText variant: the variant names deliberately EQUAL the token
 //       names) — failure and success must never be the same pixel. Colour is A
 //       channel, never the ONLY one (the surfaces keep their text + role).
+//   5d. motion discipline — (conditional on `motionSeam`) literal `duration:`/
+//       `delay:` numerics red anywhere in the walk (the motion vocabulary lives
+//       in the motion tokens; 0 passes), and `Animated./LayoutAnimation./
+//       Easing.` references red outside the seam file + the components home —
+//       the seam's hooks carry the token vocabulary AND the reduce-motion
+//       collapse, so a raw call site would ship neither. The seam ban has NO
+//       allow escape by design.
+//   5e. elevation keys — (conditional on `families.elevation`) the shadow*/
+//       elevation style keys are spelled ONLY inside the generated tokens
+//       module; consumers spread an elevation level ({ ...elevation.raised }).
+//   5f. hit-target floor — (conditional on `families.sizing`) a home file that
+//       STYLES a raw control must reference sizes.minTarget in its own code:
+//       every touchable meets the 44dp floor at the primitive, never per call
+//       site. With `controlPrimitives.base` declared, the pressable-class tags
+//       may be styled in exactly ONE home file (the touchable base) — pressed
+//       feedback, the hit target, and the haptic live there, so a second raw
+//       pressable primitive is a design-system fork.
 //   6. accent budget — the near-monochrome + single-accent design survives on
 //      a usage BUDGET: accent-token references stay <= the documented budget.
 // Dropped from the desktop original, deliberately: erasure markers (no default
@@ -455,6 +472,86 @@ if (manifest.statusSurfaces !== undefined) {
   )
 }
 
+// ---- 5d/5e/5f setup: motion discipline, elevation keys, the hit-target floor ---
+// All content-conditional like controlPrimitives (the manifest is SEEDED): each
+// absent key/family self-disables — the combined design-depth NOTE below names
+// what is off — and a present-but-malformed key fails CLOSED.
+let motionSeam = null
+if (manifest.motionSeam !== undefined) {
+  if (typeof manifest.motionSeam !== 'string' || manifest.motionSeam.trim() === '') {
+    fail(
+      GATE,
+      `${MANIFEST} motionSeam must be a non-empty file path — got ${JSON.stringify(manifest.motionSeam)}; the motion-discipline scan cannot silently disarm`,
+    )
+  }
+  motionSeam = manifest.motionSeam
+  if (!existsSync(motionSeam)) {
+    errs.push(
+      `${MANIFEST} motionSeam names "${motionSeam}" but the file does not exist — the one animation door is gone; restore it or update the manifest in review`,
+    )
+  }
+}
+const elevationArmed = manifest.families?.elevation !== undefined
+const sizingArmed = manifest.families?.sizing !== undefined
+
+// The touchable BASE: when declared, the pressable-class tags may be styled in
+// exactly ONE home file (pressed feedback, the hit target, and haptics live
+// there) — a second raw pressable primitive inside the home is a fork.
+let controlBase = null
+if (control !== null && manifest.controlPrimitives.base !== undefined) {
+  const b = manifest.controlPrimitives.base
+  const okShape =
+    b !== null &&
+    typeof b === 'object' &&
+    typeof b.file === 'string' &&
+    b.file.trim() !== '' &&
+    Array.isArray(b.tags) &&
+    b.tags.length > 0 &&
+    b.tags.every((t) => typeof t === 'string' && control.tags.includes(t))
+  if (!okShape) {
+    fail(
+      GATE,
+      `${MANIFEST} controlPrimitives.base must be { "file": non-empty string, "tags": non-empty subset of controlPrimitives.tags } — got ${JSON.stringify(b)}; the touchable-base scan cannot silently disarm`,
+    )
+  }
+  if (!existsSync(b.file)) {
+    errs.push(
+      `${MANIFEST} controlPrimitives.base names "${b.file}" but the file does not exist — the touchable base is gone; restore it or update the manifest in review`,
+    )
+  }
+  controlBase = {
+    file: b.file,
+    re: new RegExp(`<(${b.tags.join('|')})(?=[\\s/>])[^<]*?\\sstyle\\s*=`, 'g'),
+  }
+}
+
+const depthOff = [
+  motionSeam === null &&
+    'motionSeam (raw Animated/LayoutAnimation/Easing and literal duration:/delay: values would not red)',
+  !elevationArmed && 'families.elevation (raw shadow*/elevation style keys would not red)',
+  !sizingArmed &&
+    'families.sizing (a styled raw control below the 44dp hit-target floor would not red)',
+  control !== null &&
+    controlBase === null &&
+    'controlPrimitives.base (a second raw pressable primitive in the home would not red)',
+].filter(Boolean)
+if (depthOff.length > 0) {
+  console.log(
+    `${GATE}: NOTE — design-depth checks OFF: ${depthOff.join('; ')}. Current manifests declare motionSeam: "apps/mobile/src/lib/motion.ts", the motion/elevation/sizing families, and controlPrimitives.base: { "file": "apps/mobile/src/components/PressableScale.tsx", "tags": [pressable-class tags] }. ${MANIFEST} is seeded — update never rewrites it; adopt deliberately with \`update --refresh-seeded ${MANIFEST}\` (see docs/runbooks/harness-upgrade.md, content-conditional checks)`,
+  )
+}
+
+// (5d) Literal motion values: the duration/delay vocabulary lives in the motion
+// tokens — a numeric literal is an off-vocabulary animation (0 passes, like the
+// dimension scan: it is the absence of motion). (5e) The shadow/elevation style
+// keys are spelled ONLY inside the generated tokens module (src/theme, outside
+// the walk) — consumers spread elevation levels. (motion-API references are the
+// seam ban below: seam file + components home only, NO allow escape — a legit
+// new animation site belongs in one of them by doctrine.)
+const MOTION_LITERAL = /\b(duration|delay)\s*:\s*(\d+(?:\.\d+)?)\s*(?=[,};)\n])/g
+const MOTION_API = /\b(Animated|LayoutAnimation|Easing)\s*\./g
+const ELEVATION_KEY = /\b(shadowColor|shadowOffset|shadowOpacity|shadowRadius|elevation)\s*:/g
+
 // ---- 5: source-scan patterns ---------------------------------------------------
 // (a1) A string literal that IS a hex color — no other meaning in app code, so
 // it reds anywhere in a scanned file. (a2) Functional color syntax (a digit or
@@ -557,6 +654,25 @@ for (const rel of files) {
         )
       }
     }
+    // (5d) literal motion values — durations/delays come from the motion tokens.
+    if (motionSeam !== null) {
+      for (const m of code.matchAll(MOTION_LITERAL)) {
+        if (Number(m[2]) !== 0) {
+          errs.push(
+            `${rel}: literal motion value "${m[1]}: ${m[2]}" — the motion vocabulary lives in ${TOKENS_MODULE} (motion.duration.*); use a token (duration: motion.duration.base), or add a reviewed allow entry in ${MANIFEST}`,
+          )
+        }
+      }
+    }
+    // (5e) shadow/elevation style keys — spelled only inside the generated
+    // tokens module; consumers spread an elevation level.
+    if (elevationArmed) {
+      for (const m of code.matchAll(ELEVATION_KEY)) {
+        errs.push(
+          `${rel}: raw elevation key "${m[1]}:" — depth is a token: spread a level from ${TOKENS_MODULE} ({ ...elevation.raised }), or add a reviewed allow entry in ${MANIFEST}`,
+        )
+      }
+    }
     // (c) inline style objects, outside the components home only: primitives may
     // merge a caller-supplied style, but a screen styles through factories.
     if (isTsx && !rel.startsWith(`${componentsHome}/`)) {
@@ -570,6 +686,44 @@ for (const rel of files) {
             `${rel}: inline ${m[1]}={{ ${v[1]}: ${v[2]} }} — raw values in an inline style object; build the style in a useThemedStyles factory from the tokens, or add a reviewed allow entry in ${MANIFEST}`,
           )
         }
+      }
+    }
+  }
+
+  // ---- 5d seam ban: motion APIs live in the seam + the components home only.
+  // No allow escape: a legitimate new animation site belongs in one of them by
+  // doctrine — the reduce-motion collapse and the token vocabulary both live in
+  // the seam's hooks, and a raw Animated call site would carry neither.
+  if (
+    motionSeam !== null &&
+    rel !== motionSeam &&
+    !rel.startsWith(`${componentsHome}/`) &&
+    !rel.startsWith('theme/')
+  ) {
+    for (const m of code.matchAll(MOTION_API)) {
+      errs.push(
+        `${rel}: raw ${m[1]}. reference outside the motion seam — animation goes through ${motionSeam} (useEntrance/usePulse/usePressScale: motion tokens + the reduce-motion collapse) or a primitive in ${componentsHome}`,
+      )
+    }
+  }
+
+  // ---- 5b-home: inside the primitives home, the touchable base owns the
+  // pressable tags, and any file styling a raw control must meet the
+  // hit-target floor in its own style.
+  if (CONTROL_RE !== null && isTsx && rel.startsWith(`${control.home}/`)) {
+    const styledControls = [...code.matchAll(CONTROL_RE)]
+    if (styledControls.length > 0) {
+      if (controlBase !== null && rel !== controlBase.file) {
+        for (const m of code.matchAll(controlBase.re)) {
+          errs.push(
+            `${rel}: raw <${m[1]} …> styled outside the touchable base — pressed feedback, the hit target, and the haptic all live in ${controlBase.file}; render through it, or move this control's styling INTO the base`,
+          )
+        }
+      }
+      if (sizingArmed && !/\bminTarget\b/.test(code)) {
+        errs.push(
+          `${rel}: styles a raw control but never references sizes.minTarget — every touchable meets the 44dp floor in its own style: add minHeight: sizes.minTarget, or render through the touchable base`,
+        )
       }
     }
   }
@@ -675,7 +829,13 @@ const statusNote =
   status === null
     ? ''
     : `; every status surface (${status.signals.join(', ')}) carries a ${status.tokens.join('/')} token`
+const depthNote = [
+  motionSeam === null ? '' : `; motion through the seam (${motionSeam}) + motion tokens only`,
+  elevationArmed ? '; elevation spread from tokens' : '',
+  sizingArmed && control !== null ? '; styled raw controls meet minTarget' : '',
+  controlBase === null ? '' : `; pressable tags based in ${controlBase.file}`,
+].join('')
 ok(
   GATE,
-  `${documented.size} tokens × ${themeCount} theme(s) in lockstep with ${TOKENS_MODULE} (regen-diff clean); no raw color/dimension/inline-style escapes; accent ${accentUses}/${manifest.accentUsageBudget}${contrastNote}${controlNote}${statusNote}`,
+  `${documented.size} tokens × ${themeCount} theme(s) in lockstep with ${TOKENS_MODULE} (regen-diff clean); no raw color/dimension/inline-style escapes; accent ${accentUses}/${manifest.accentUsageBudget}${contrastNote}${controlNote}${statusNote}${depthNote}`,
 )

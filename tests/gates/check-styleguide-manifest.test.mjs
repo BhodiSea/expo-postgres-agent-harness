@@ -50,6 +50,21 @@ function fixture({
       mkdirSync(join(dir, 'apps/mobile/src/theme'), { recursive: true })
       writeFileSync(join(dir, 'apps/mobile/src/theme/tokens.gen.ts'), tokensModule)
     }
+    // The shipped manifest names a motion seam and a touchable base — plant
+    // minimal stand-ins by default so their existence checks hold, exactly
+    // like the tokens module above. Tests override them via `sources`.
+    const seamAndBase = {
+      'apps/mobile/src/lib/motion.ts': 'export const seam = true\n',
+      'apps/mobile/src/components/PressableScale.tsx':
+        'const base = { minHeight: sizes.minTarget }\nexport const PressableScale = () => <Pressable style={base}>x</Pressable>\n',
+    }
+    for (const [rel, content] of Object.entries(seamAndBase)) {
+      if (sources[rel] === undefined) {
+        const abs = join(dir, rel)
+        mkdirSync(dirname(abs), { recursive: true })
+        writeFileSync(abs, content)
+      }
+    }
   }
   for (const [rel, content] of Object.entries(sources)) {
     const abs = join(dir, rel)
@@ -392,8 +407,15 @@ test('RED: a raw styled control outside the primitives home reds with the FIX li
   assert.ok(input.out.includes('the Input primitive'), input.out)
 })
 
-test('GREEN: the declared home dir is where raw controls live by design', () => {
-  const r = runGate(fixture({ sources: { 'apps/mobile/src/components/Button.tsx': RAW_PRESSABLE } }))
+test('GREEN: the touchable BASE file is where raw pressables live by design (0.1.2: base supersedes home-wide)', () => {
+  const r = runGate(
+    fixture({
+      sources: {
+        'apps/mobile/src/components/PressableScale.tsx':
+          'const s = { b: { minHeight: sizes.minTarget } }\nexport const Base = () => (\n  <Pressable style={s.b} onPress={go}>\n    Go\n  </Pressable>\n)\n',
+      },
+    }),
+  )
   assert.equal(r.code, 0, r.out)
 })
 
@@ -529,6 +551,171 @@ test('status: a keyless manifest self-disables with the adoption NOTE', () => {
   )
   assert.equal(r.code, 0, r.out)
   assert.ok(r.out.includes('no "statusSurfaces" key'), r.out)
+  assert.ok(r.out.includes('refresh-seeded'), r.out)
+})
+
+// ---- 5d/5e/5f: motion discipline, elevation keys, the hit-target floor -----------
+
+test('RED 5d: a literal duration/delay outside the motion tokens reds; 0 and token refs pass', () => {
+  const red = runGate(
+    fixture({
+      sources: {
+        'apps/mobile/src/features/x/anim.ts': 'export const cfg = { duration: 250 }\n',
+      },
+    }),
+  )
+  assert.equal(red.code, 1, red.out)
+  assert.ok(red.out.includes('literal motion value "duration: 250"'), red.out)
+
+  const green = runGate(
+    fixture({
+      sources: {
+        'apps/mobile/src/features/x/anim.ts':
+          'export const cfg = { duration: motion.duration.base, delay: 0 }\n',
+      },
+    }),
+  )
+  assert.equal(green.code, 0, green.out)
+})
+
+test('RED 5d: a raw Animated/Easing reference outside the seam and the home reds; both allowed homes pass', () => {
+  const body = 'export const spin = () => Animated.timing(v, { toValue: 1 })\n'
+  const red = runGate(fixture({ sources: { 'apps/mobile/src/features/x/spin.ts': body } }))
+  assert.equal(red.code, 1, red.out)
+  assert.ok(red.out.includes('raw Animated. reference outside the motion seam'), red.out)
+  assert.ok(red.out.includes('apps/mobile/src/lib/motion.ts'), red.out)
+
+  const inSeam = runGate(fixture({ sources: { 'apps/mobile/src/lib/motion.ts': body } }))
+  assert.equal(inSeam.code, 0, inSeam.out)
+
+  const inHome = runGate(fixture({ sources: { 'apps/mobile/src/components/Spinny.tsx': body } }))
+  assert.equal(inHome.code, 0, inHome.out)
+})
+
+test('RED 5d: a motionSeam naming a missing file is stale, and a malformed key fails CLOSED', () => {
+  const stale = runGate(
+    fixture({ manifest: withManifest((m) => (m.motionSeam = 'apps/mobile/src/lib/gone.ts')) }),
+  )
+  assert.equal(stale.code, 1, stale.out)
+  assert.ok(stale.out.includes('but the file does not exist'), stale.out)
+  assert.ok(stale.out.includes('the one animation door is gone'), stale.out)
+
+  const malformed = runGate(fixture({ manifest: withManifest((m) => (m.motionSeam = '  ')) }))
+  assert.equal(malformed.code, 1, malformed.out)
+  assert.ok(malformed.out.includes('motionSeam must be a non-empty file path'), malformed.out)
+})
+
+test('RED 5e: a raw shadow/elevation style key outside the tokens module reds', () => {
+  const r = runGate(
+    fixture({
+      sources: {
+        'apps/mobile/src/features/x/depth.ts': 'export const s = { shadowOpacity: 0.3 }\n',
+      },
+    }),
+  )
+  assert.equal(r.code, 1, r.out)
+  assert.ok(r.out.includes('raw elevation key "shadowOpacity:"'), r.out)
+  assert.ok(r.out.includes('...elevation.raised'), r.out)
+})
+
+const STYLED_PRESSABLE_NO_TARGET =
+  'export const Chip = () => <Pressable style={s.chip} onPress={go}>x</Pressable>\n'
+
+test('RED 5f: a home file styling a raw control without minTarget reds; referencing it passes', () => {
+  const rel = 'apps/mobile/src/components/Chip.tsx'
+  const red = runGate(fixture({ sources: { [rel]: STYLED_PRESSABLE_NO_TARGET } }))
+  assert.equal(red.code, 1, red.out)
+  assert.ok(red.out.includes('never references sizes.minTarget'), red.out)
+
+  const green = runGate(
+    fixture({
+      sources: {
+        [rel]:
+          'const s = { chip: { minHeight: sizes.minTarget } }\nexport const Chip = () => <Pressable style={s.chip} onPress={go}>x</Pressable>\n',
+      },
+    }),
+  )
+  // Still red — the BASE check: a pressable styled outside the declared base.
+  assert.equal(green.code, 1, green.out)
+  assert.ok(green.out.includes('styled outside the touchable base'), green.out)
+})
+
+test('RED base: a second raw pressable primitive in the home reds naming the base; TextInput files stay per-home rules', () => {
+  const pressable = runGate(
+    fixture({
+      sources: {
+        'apps/mobile/src/components/AltButton.tsx':
+          'const s = { b: { minHeight: sizes.minTarget } }\nexport const AltButton = () => <Pressable style={s.b} onPress={go}>x</Pressable>\n',
+      },
+    }),
+  )
+  assert.equal(pressable.code, 1, pressable.out)
+  assert.ok(pressable.out.includes('styled outside the touchable base'), pressable.out)
+  assert.ok(pressable.out.includes('PressableScale.tsx'), pressable.out)
+
+  // A styled TextInput in its own home file is NOT a base violation (the base
+  // tags are the pressable class) — it only owes the minTarget reference.
+  const input = runGate(
+    fixture({
+      sources: {
+        'apps/mobile/src/components/AltInput.tsx':
+          'const s = { f: { minHeight: sizes.minTarget } }\nexport const AltInput = () => <TextInput style={s.f} />\n',
+      },
+    }),
+  )
+  assert.equal(input.code, 0, input.out)
+})
+
+test('RED base: malformed controlPrimitives.base fails CLOSED; a base tag outside controlPrimitives.tags too', () => {
+  const malformed = runGate(
+    fixture({
+      manifest: withManifest((m) => {
+        m.controlPrimitives.base = { file: '', tags: ['Pressable'] }
+      }),
+    }),
+  )
+  assert.equal(malformed.code, 1, malformed.out)
+  assert.ok(malformed.out.includes('controlPrimitives.base must be'), malformed.out)
+
+  const alienTag = runGate(
+    fixture({
+      manifest: withManifest((m) => {
+        m.controlPrimitives.base.tags = ['Pressable', 'ScrollView']
+      }),
+    }),
+  )
+  assert.equal(alienTag.code, 1, alienTag.out)
+  assert.ok(alienTag.out.includes('subset of controlPrimitives.tags'), alienTag.out)
+})
+
+test('keyless design-depth manifest self-disables with ONE combined adoption NOTE', () => {
+  const r = runGate(
+    fixture({
+      manifest: withManifest((m) => {
+        delete m.motionSeam
+        delete m.families.elevation
+        delete m.families.sizing
+        delete m.controlPrimitives.base
+      }),
+      // Regenerate the module for the shrunken manifest so regen-diff stays green.
+      tokensModule: renderTokensModule(
+        withManifest((m) => {
+          delete m.families.elevation
+          delete m.families.sizing
+        }),
+      ),
+      sources: {
+        // All three violations are withheld — the scans are off.
+        'apps/mobile/src/features/x/loose.ts':
+          'export const cfg = { duration: 250, shadowOpacity: 0.3 }\n',
+        'apps/mobile/src/components/Chip.tsx': STYLED_PRESSABLE_NO_TARGET,
+      },
+    }),
+  )
+  assert.equal(r.code, 0, r.out)
+  assert.ok(r.out.includes('design-depth checks OFF'), r.out)
+  assert.ok(r.out.includes('motionSeam'), r.out)
+  assert.ok(r.out.includes('families.elevation'), r.out)
   assert.ok(r.out.includes('refresh-seeded'), r.out)
 })
 

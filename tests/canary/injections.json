@@ -142,7 +142,7 @@
       {
         "kind": "fixture",
         "ref": "tests/gates/check-styleguide-manifest.test.mjs",
-        "note": "raw hex/rgb()/named-color literals in color positions red; numeric literals in dimension style keys red; inline style={{…}} raw numerics outside the components home red; a hand-edited tokens.gen.ts reds the regen-diff; a below-min contrast pair (AAA 7:1 body pairs, AA 4.5 elsewhere) reds with the computed ratio; primitive-boundary (controlPrimitives) and status-surface (statusSurfaces) scans red per manifest data, and their allow lists fail closed on malformed/stale entries"
+        "note": "raw hex/rgb()/named-color literals in color positions red; numeric literals in dimension style keys red; inline style={{…}} raw numerics outside the components home red; a hand-edited tokens.gen.ts reds the regen-diff; a below-min contrast pair (AAA 7:1 body pairs, AA 4.5 elsewhere) reds with the computed ratio; primitive-boundary (controlPrimitives) and status-surface (statusSurfaces) scans red per manifest data, and their allow lists fail closed on malformed/stale entries; 0.1.2 design-depth: literal duration:/delay: numerics red (motion tokens own the vocabulary), raw Animated./LayoutAnimation./Easing. references outside the motion seam + components home red with NO allow escape, raw shadow*/elevation style keys outside the tokens module red, a home file styling a raw control without a sizes.minTarget reference reds, and a raw pressable styled outside controlPrimitives.base reds — each keyed on its manifest key (keyless manifests self-disable with ONE combined adoption NOTE; malformed keys and stale seam/base paths fail closed)"
       },
       {
         "kind": "selftest",

@@ -122,8 +122,19 @@
       "Button",
       "Switch"
     ],
-    "home": "apps/mobile/src/components"
+    "home": "apps/mobile/src/components",
+    "base": {
+      "file": "apps/mobile/src/components/PressableScale.tsx",
+      "tags": [
+        "Pressable",
+        "TouchableOpacity",
+        "TouchableHighlight",
+        "TouchableWithoutFeedback",
+        "Button"
+      ]
+    }
   },
+  "motionSeam": "apps/mobile/src/lib/motion.ts",
   "controlAllow": [],
   "allow": [],
   "statusSurfaces": {
