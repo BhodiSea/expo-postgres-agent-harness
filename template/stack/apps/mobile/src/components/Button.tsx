@@ -1,13 +1,15 @@
-import { Pressable, Text } from 'react-native'
+import { Text } from 'react-native'
 import { type Palette, useThemedStyles } from '../theme/theme'
-import { fontWeight, radius, spacing, typeScale } from '../theme/tokens.gen'
+import { fontScaleCap, fontWeight, radius, sizes, spacing, typeScale } from '../theme/tokens.gen'
+import { PressableScale } from './PressableScale'
 
-// The one button primitive. Consolidating every touchable action here means the
+// The one button primitive, rendered through the PressableScale base — the
 // accent affordance and the a11y contract live in exactly ONE place: `label` is
 // BOTH the visible text and the accessible name (a single source, so they can
 // never disagree), the role is always button, and the disabled state is
-// mirrored into accessibilityState. Variant picks from a closed map, never
-// free-form styles.
+// mirrored into accessibilityState by the base. Variant picks from a closed
+// map, never free-form styles; pressed/disabled feedback (scale + opacity) and
+// the 44dp hit target come from the base.
 type ButtonVariant = 'solid' | 'outline' | 'ghost'
 
 interface ButtonProps {
@@ -21,9 +23,13 @@ interface ButtonProps {
 }
 
 const buttonStyles = (palette: Palette) => ({
-  base: {
+  container: {
     alignSelf: 'flex-start' as const,
+  },
+  base: {
+    alignItems: 'center' as const,
     borderRadius: radius.sm,
+    minWidth: sizes.minTarget,
     paddingHorizontal: spacing * 4,
     paddingVertical: spacing * 2,
   },
@@ -50,12 +56,6 @@ const buttonStyles = (palette: Palette) => ({
   labelQuiet: {
     color: palette['ink-muted'],
   },
-  pressed: {
-    opacity: 0.7,
-  },
-  disabled: {
-    opacity: 0.5,
-  },
 })
 
 export function Button({
@@ -68,22 +68,21 @@ export function Button({
 }: ButtonProps) {
   const styles = useThemedStyles(buttonStyles)
   return (
-    <Pressable
-      accessibilityRole="button"
+    <PressableScale
+      onPress={onPress}
+      disabled={disabled}
       accessibilityLabel={label}
       accessibilityHint={accessibilityHint}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
       testID={testID}
-      style={({ pressed }) => [
-        styles.base,
-        styles[variant],
-        pressed && styles.pressed,
-        disabled && styles.disabled,
-      ]}
+      containerStyle={styles.container}
+      style={[styles.base, styles[variant]]}
     >
-      <Text style={[styles.label, variant !== 'solid' && styles.labelQuiet]}>{label}</Text>
-    </Pressable>
+      <Text
+        maxFontSizeMultiplier={fontScaleCap.default}
+        style={[styles.label, variant !== 'solid' && styles.labelQuiet]}
+      >
+        {label}
+      </Text>
+    </PressableScale>
   )
 }

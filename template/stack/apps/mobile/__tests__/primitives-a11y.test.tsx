@@ -10,7 +10,9 @@
 // layout-only View, because Fabric view flattening can detach the latter on
 // device (design record: CI-LANE-FACTS).
 import { fireEvent, render, screen } from '@testing-library/react-native'
-import { AccessibilityInfo, Text } from 'react-native'
+import type { StyleProp, ViewStyle } from 'react-native'
+import { AccessibilityInfo, StyleSheet, Text } from 'react-native'
+import { AppText } from '../src/components/AppText'
 import { Button } from '../src/components/Button'
 import { EmptyState } from '../src/components/EmptyState'
 import { Field } from '../src/components/Field'
@@ -21,6 +23,21 @@ import { MatrixList } from '../src/features/matrix/MatrixList'
 import { MATRIX_COLUMNS, makeSyntheticRows } from '../src/features/matrix/matrixData'
 import { PerfSubject } from '../src/features/matrix/perfSubject'
 import { en } from '../src/i18n/catalog'
+import { haptic } from '../src/lib/haptics'
+import { fontScaleCap, sizes } from '../src/theme/tokens.gen'
+
+// The SEAM is mocked (not the engine): what this file pins is the WIRING — which
+// primitive speaks which vocabulary word. The seam's own engine mapping is
+// covered by src/lib/haptics.test.ts.
+jest.mock('../src/lib/haptics', () => ({ haptic: jest.fn() }))
+
+afterEach(() => {
+  jest.clearAllMocks()
+})
+
+// Flatten a rendered element's style array into one object for layout assertions.
+const flatStyle = (props: Record<string, unknown>) =>
+  StyleSheet.flatten(props['style'] as StyleProp<ViewStyle>)
 
 describe('Button', () => {
   it('exposes role=button with its label as the accessible name', () => {
@@ -152,6 +169,62 @@ describe('Toast', () => {
     const dismiss = screen.getByRole('button', { name: en['common.dismiss'] })
     fireEvent.press(dismiss)
     expect(screen.queryByTestId('toast-error')).toBeNull()
+  })
+})
+
+describe('hit targets — the sizes.minTarget floor', () => {
+  it('Button, OptionRow and Input all flatten to minHeight >= 44dp', () => {
+    render(<Button label="Target" onPress={jest.fn()} />)
+    const button = flatStyle(screen.getByRole('button', { name: 'Target' }).props)
+    expect(button.minHeight).toBeGreaterThanOrEqual(sizes.minTarget)
+
+    render(<OptionRow label="Row target" onPress={jest.fn()} />)
+    const row = flatStyle(screen.getByRole('button', { name: 'Row target' }).props)
+    expect(row.minHeight).toBeGreaterThanOrEqual(sizes.minTarget)
+
+    render(<Input accessibilityLabel="Field target" accessibilityHint="hit-target fixture" />)
+    const input = flatStyle(screen.getByLabelText('Field target').props)
+    expect(input.minHeight).toBeGreaterThanOrEqual(sizes.minTarget)
+  })
+})
+
+describe('haptics wiring — the closed vocabulary', () => {
+  it('OptionRow speaks selection on press; Button stays silent by default', () => {
+    render(<OptionRow label="Pick me" onPress={jest.fn()} />)
+    fireEvent.press(screen.getByRole('button', { name: 'Pick me' }))
+    expect(haptic).toHaveBeenCalledWith('selection')
+
+    render(<Button label="Plain press" onPress={jest.fn()} />)
+    fireEvent.press(screen.getByRole('button', { name: 'Plain press' }))
+    expect(haptic).toHaveBeenCalledTimes(1)
+  })
+
+  it('an error toast speaks warning; info speaks nothing', () => {
+    render(
+      <ToastProvider>
+        <ToastTrigger message="write lost" tone="error" />
+      </ToastProvider>,
+    )
+    fireEvent.press(screen.getByTestId('toast-trigger'))
+    expect(haptic).toHaveBeenCalledWith('warning')
+    expect(haptic).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('AppText font scaling', () => {
+  it('caps OS font scaling at the default cap; an explicit dense cap wins', () => {
+    render(<AppText testID="cap-default">scaled</AppText>)
+    expect(screen.getByTestId('cap-default').props['maxFontSizeMultiplier'] as number).toBe(
+      fontScaleCap.default,
+    )
+    render(
+      <AppText testID="cap-dense" maxFontSizeMultiplier={fontScaleCap.dense}>
+        dense
+      </AppText>,
+    )
+    expect(screen.getByTestId('cap-dense').props['maxFontSizeMultiplier'] as number).toBe(
+      fontScaleCap.dense,
+    )
   })
 })
 

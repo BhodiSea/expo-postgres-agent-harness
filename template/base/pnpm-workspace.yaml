@@ -79,6 +79,7 @@ catalog:
   expo-auth-session: ~57.0.4 # Entra PKCE (src/auth/providers/entra.ts); pulls expo-application/expo-crypto/expo-web-browser as its own deps
   expo-constants: ~57.0.6
   expo-crypto: ~57.0.1 # PKCE digest backend for expo-auth-session (native module, no config plugin)
+  expo-haptics: ~57.0.1 # the one haptics door (src/lib/haptics.ts): selection/success/warning vocabulary, wired only into PressableScale + Toast
   expo-linking: ~57.0.3
   expo-localization: ~57.0.1
   expo-router: 57.0.7 # exact: version-sync's exact-pin set

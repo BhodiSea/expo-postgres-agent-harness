@@ -30,6 +30,7 @@ export const CITATION_DOMAINS = [
   'docs.expo.dev', // Expo SDK / EAS / config reference — NOT the expo.dev apex
   'reactnative.dev', // React Native docs
   'developer.android.com', // Android platform docs (permissions, network security)
+  'developer.apple.com', // Apple developer docs (HIG, App Review Guidelines, Info.plist keys)
   'learn.microsoft.com', // Microsoft Learn (Entra ID, API guidelines) — not microsoft.com at large
   // Genuine authorities the template tree itself cites by bare URL.
   'w3.org', // WCAG / WAI-ARIA / CSS specifications

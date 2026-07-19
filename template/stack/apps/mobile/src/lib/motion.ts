@@ -84,6 +84,41 @@ export function useEntrance(offset: number = spacing * 2): {
   }
 }
 
+/**
+ * Pressed-state scale for the PressableScale primitive: eases to the manifest's
+ * pressScale on press-in, back to rest on release. Under reduce-motion the
+ * value snaps instantly — state feedback without travel.
+ */
+export function usePressScale(): {
+  readonly scale: Animated.Value
+  readonly pressIn: () => void
+  readonly pressOut: () => void
+} {
+  const reduced = useReducedMotion()
+  const [scale] = useState(() => new Animated.Value(1))
+  const animateTo = (toValue: number): void => {
+    if (reduced) {
+      scale.setValue(toValue)
+      return
+    }
+    Animated.timing(scale, {
+      toValue,
+      duration: motion.duration.fast,
+      easing: easingOf('standard'),
+      useNativeDriver: true,
+    }).start()
+  }
+  return {
+    scale,
+    pressIn: () => {
+      animateTo(motion.pressScale)
+    },
+    pressOut: () => {
+      animateTo(1)
+    },
+  }
+}
+
 // The pulse floor: skeletons breathe between full and this opacity — deep enough
 // to read as activity, shallow enough that the placeholder never strobes.
 const PULSE_MIN_OPACITY = 0.55

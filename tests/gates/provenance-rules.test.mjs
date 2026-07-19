@@ -319,6 +319,10 @@ test("isAllowedCitationHost: this stack's platform docs hosts are ON; their apex
   assert.equal(isAllowedCitationHost('expo.dev'), false)
   assert.equal(isAllowedCitationHost('reactnative.dev'), true)
   assert.equal(isAllowedCitationHost('developer.android.com'), true)
+  // developer.apple.com joined in 0.1.2: HIG hit-target guidance and the App
+  // Review Guidelines/Info.plist keys the store-readiness checks cite.
+  assert.equal(isAllowedCitationHost('developer.apple.com'), true)
+  assert.equal(isAllowedCitationHost('apple.com'), false)
   // docs.github.com (GitHub's OWN product docs) matches; github.com does not.
   assert.equal(isAllowedCitationHost('docs.github.com'), true)
   // learn.microsoft.com is listed — but not microsoft.com at large.

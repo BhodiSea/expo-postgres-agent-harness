@@ -129,8 +129,18 @@ export default tseslint.config(
     // agreed with the doctrine, so the exemption tightened to match). depcruise
     // enforces the same wall on the resolved module graph — lint catches it at
     // the write, architecture at validate.
+    // The haptics engine has ONE door too: src/lib/haptics.ts (the closed
+    // selection/success/warning vocabulary) — both seams share this block, so
+    // each seam file is exempt from the other's ban only through the module
+    // graph rules depcruise owns.
     files: ['apps/mobile/**/*.ts', 'apps/mobile/**/*.tsx'],
-    ignores: ['apps/mobile/src/host/**'],
+    // haptics.test.ts sits beside the seam: proving the engine mapping requires
+    // mocking the engine, which requires importing it.
+    ignores: [
+      'apps/mobile/src/host/**',
+      'apps/mobile/src/lib/haptics.ts',
+      'apps/mobile/src/lib/haptics.test.ts',
+    ],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -140,6 +150,11 @@ export default tseslint.config(
               group: ['expo-secure-store', 'expo-secure-store/*'],
               message:
                 'The keychain has one door: import the secure* helpers from src/host (or go through src/auth providers). Direct expo-secure-store use bypasses the corrupt-safe seam.',
+            },
+            {
+              group: ['expo-haptics', 'expo-haptics/*'],
+              message:
+                'Haptics have one door: call haptic() from src/lib/haptics.ts — the closed selection/success/warning vocabulary keeps tactile feedback consistent app-wide.',
             },
           ],
         },
@@ -174,6 +189,11 @@ export default tseslint.config(
               group: ['expo-secure-store', 'expo-secure-store/*'],
               message:
                 'The keychain has one door: import the secure* helpers from src/host (or go through src/auth providers). Direct expo-secure-store use bypasses the corrupt-safe seam.',
+            },
+            {
+              group: ['expo-haptics', 'expo-haptics/*'],
+              message:
+                'Haptics have one door: call haptic() from src/lib/haptics.ts — the closed selection/success/warning vocabulary keeps tactile feedback consistent app-wide.',
             },
           ],
         },

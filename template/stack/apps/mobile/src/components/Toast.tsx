@@ -1,6 +1,7 @@
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react'
 import { AccessibilityInfo, Animated, View } from 'react-native'
 import { useI18n } from '../i18n'
+import { haptic } from '../lib/haptics'
 import { useEntrance } from '../lib/motion'
 import { type Palette, useThemedStyles } from '../theme/theme'
 import { elevation, radius, spacing } from '../theme/tokens.gen'
@@ -149,6 +150,10 @@ export function ToastProvider({ children }: { readonly children: ReactNode }) {
     nextId.current += 1
     const id = nextId.current
     setToasts((current) => [...current, { id, message, tone }])
+    // Status tones get a tactile channel too — warning for a failed write,
+    // success for a landed one (the haptics seam is fail-silent by design).
+    if (tone === 'error') haptic('warning')
+    if (tone === 'success') haptic('success')
     // The ANNOUNCEMENT is the accessibility contract: a toast appears outside
     // the focus path, so without this a screen-reader user simply never learns
     // their write failed. Fail-silent under a mocked native layer (jest).

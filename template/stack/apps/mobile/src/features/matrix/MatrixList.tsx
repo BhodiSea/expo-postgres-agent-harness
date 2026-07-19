@@ -2,7 +2,7 @@ import { FlatList, View } from 'react-native'
 import { AppText } from '../../components/AppText'
 import { formatCellValue, useI18n } from '../../i18n'
 import { type Palette, useThemedStyles } from '../../theme/theme'
-import { spacing, typeScale } from '../../theme/tokens.gen'
+import { fontScaleCap, spacing, typeScale } from '../../theme/tokens.gen'
 import type { MatrixColumn, MatrixRow } from './matrixData'
 
 // The dense list — the RN successor of the desktop original's virtualized grid.
@@ -23,8 +23,11 @@ import type { MatrixColumn, MatrixRow } from './matrixData'
 
 // Row height in dp — getItemLayout's contract with the styles below. A drifted
 // pair would make FlatList scroll to the wrong offsets, so it is ONE constant.
+// 44 is the hit-target floor (sizes.minTarget): rows are not pressable today,
+// but a fixed-height row below 44dp also clips sm text at font_scale 1.3 — the
+// dense fontScaleCap below and this height move together.
 /** @public — seam API: the layout constant device tests measure against. */
-export const MATRIX_ROW_HEIGHT = 36
+export const MATRIX_ROW_HEIGHT = 44
 
 // FlatList tuning: ~7 viewports of rows kept warm (the default 21 is tuned for
 // media feeds; dense 36dp rows make that thousands of mounted Texts), small
@@ -109,9 +112,20 @@ export function MatrixList({ rows, columns, onEndReached }: MatrixListProps) {
       stickyHeaderIndices={[0]}
       ListHeaderComponent={
         <View style={styles.row} accessible accessibilityRole="header">
-          <AppText style={[styles.label, styles.headerCell]}>{t('matrix.column.note')}</AppText>
+          {/* Fixed-height rows cap OS font scaling at the dense factor — the
+              default cap would let sm text outgrow the 44dp row and clip. */}
+          <AppText
+            maxFontSizeMultiplier={fontScaleCap.dense}
+            style={[styles.label, styles.headerCell]}
+          >
+            {t('matrix.column.note')}
+          </AppText>
           {columns.map((column) => (
-            <AppText key={column.key} style={[styles.cell, styles.headerCell]}>
+            <AppText
+              key={column.key}
+              maxFontSizeMultiplier={fontScaleCap.dense}
+              style={[styles.cell, styles.headerCell]}
+            >
               {t(column.labelKey)}
             </AppText>
           ))}
@@ -130,11 +144,19 @@ export function MatrixList({ rows, columns, onEndReached }: MatrixListProps) {
           accessibilityLabel={item.label}
           testID={`matrix-row-${item.id}`}
         >
-          <AppText style={styles.label} numberOfLines={1}>
+          <AppText
+            maxFontSizeMultiplier={fontScaleCap.dense}
+            style={styles.label}
+            numberOfLines={1}
+          >
             {item.label}
           </AppText>
           {item.values.map((value, index) => (
-            <AppText key={columns[index]?.key ?? String(index)} style={styles.cell}>
+            <AppText
+              key={columns[index]?.key ?? String(index)}
+              maxFontSizeMultiplier={fontScaleCap.dense}
+              style={styles.cell}
+            >
               {formatCellValue(value)}
             </AppText>
           ))}

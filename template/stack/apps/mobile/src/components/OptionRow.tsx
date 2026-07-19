@@ -1,15 +1,16 @@
-import { Pressable } from 'react-native'
 import { type Palette, useThemedStyles } from '../theme/theme'
 import { radius, spacing } from '../theme/tokens.gen'
 import { AppText } from './AppText'
+import { PressableScale } from './PressableScale'
 
 // The selectable-row primitive: one pressable option in a picker surface (the
-// actions modal's command rows). Like Button, `label` is BOTH the visible text
-// and the accessible name (a single source, so they can never disagree), the
-// role is always button, and the pressed affordance is the one tokens-only
-// opacity dip. The testID rides THIS Pressable — the interactive LEAF — never
-// a wrapper View: Fabric view flattening can detach a testID on a bare
-// layout-only View (design record: CI-LANE-FACTS, New Architecture caveat).
+// actions modal's command rows), rendered through the PressableScale base. Like
+// Button, `label` is BOTH the visible text and the accessible name (a single
+// source, so they can never disagree) and the role is always button; the base
+// contributes the scale-plus-opacity pressed affordance, the 44dp hit target,
+// and the selection haptic — picking an option is the canonical selection
+// moment. The testID rides the base's Pressable — the interactive LEAF — never
+// a wrapper View (design record: CI-LANE-FACTS, New Architecture caveat).
 interface OptionRowProps {
   readonly label: string
   readonly onPress: () => void
@@ -27,23 +28,20 @@ const optionRowStyles = (palette: Palette) => ({
     paddingHorizontal: spacing * 3,
     paddingVertical: spacing * 2,
   },
-  pressed: {
-    opacity: 0.7,
-  },
 })
 
 export function OptionRow({ label, onPress, accessibilityHint, testID }: OptionRowProps) {
   const styles = useThemedStyles(optionRowStyles)
   return (
-    <Pressable
-      accessibilityRole="button"
+    <PressableScale
+      onPress={onPress}
+      haptic="selection"
       accessibilityLabel={label}
       accessibilityHint={accessibilityHint}
-      onPress={onPress}
       testID={testID}
-      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+      style={styles.row}
     >
       <AppText>{label}</AppText>
-    </Pressable>
+    </PressableScale>
   )
 }
