@@ -47,8 +47,12 @@ function resolveNode(node) {
   return { type: node.type, props: node.props || {}, children: resolveNode(node.children || []) }
 }
 function create(element) {
-  const tree = resolveNode(element)
-  return { toJSON: function () { return tree }, unmount: function () {} }
+  let tree = resolveNode(element)
+  return {
+    toJSON: function () { return tree },
+    update: function (next) { tree = resolveNode(next) },
+    unmount: function () {},
+  }
 }
 function act(cb) { cb() }
 module.exports = { create: create, act: act }
@@ -343,6 +347,74 @@ test('RED: an over-budget median re-measures ONCE, then fails naming the subject
   assert.ok(r.out.includes(`subject ${MATRIX_SUBJECT}`), r.out)
 })
 
+// ---- update phase (0.1.2): the re-render cost a mount-only benchmark never sees --
+
+test('update phase: the median is always measured and printed; asserted only when budgeted', () => {
+  // No medianUpdateBudgetMs → prior red/green behavior, update median printed.
+  const unbudgeted = runGate(
+    fixture({ budget: subjectsBudget(), stubs: true, files: { [MATRIX_SUBJECT]: SUBJECT_SRC } }),
+  )
+  assert.equal(unbudgeted.code, 0, unbudgeted.out)
+  assert.ok(/update median \d+\.\dms/.test(unbudgeted.out), unbudgeted.out)
+  assert.ok(!/update median [\d.]+ms \(budget/.test(unbudgeted.out), unbudgeted.out)
+
+  // A generous update budget passes and prints beside the median.
+  const budgeted = runGate(
+    fixture({
+      budget: {
+        runs: 3,
+        subjects: [
+          { subject: MATRIX_SUBJECT, cells: 50, medianBudgetMs: 100000, medianUpdateBudgetMs: 100000 },
+        ],
+      },
+      stubs: true,
+      files: { [MATRIX_SUBJECT]: SUBJECT_SRC },
+    }),
+  )
+  assert.equal(budgeted.code, 0, budgeted.out)
+  assert.ok(budgeted.out.includes('(budget 100000ms)'), budgeted.out)
+})
+
+test('RED update phase: an over-budget update median re-measures ONCE, then fails naming the update path', () => {
+  const dir = fixture({
+    budget: {
+      runs: 3,
+      subjects: [
+        {
+          subject: MATRIX_SUBJECT,
+          cells: 50,
+          medianBudgetMs: 100000,
+          medianUpdateBudgetMs: 0.000001,
+        },
+      ],
+    },
+    stubs: true,
+    files: { [MATRIX_SUBJECT]: SUBJECT_SRC },
+  })
+  const r = runGate(dir)
+  assert.equal(r.code, 1, r.out)
+  assert.ok(r.out.includes('(re-measured once)'), r.out)
+  assert.ok(r.out.includes('update (re-render) cost regressed past the budget twice in a row'), r.out)
+})
+
+test('RED update phase: a malformed medianUpdateBudgetMs is a contract FAIL before any spawn', () => {
+  for (const bad of [-1, 0, 'fast']) {
+    const r = runGate(
+      fixture({
+        budget: {
+          runs: 3,
+          subjects: [
+            { subject: MATRIX_SUBJECT, cells: 50, medianBudgetMs: 1, medianUpdateBudgetMs: bad },
+          ],
+        },
+        files: { [MATRIX_SUBJECT]: SUBJECT_SRC },
+      }),
+    )
+    assert.equal(r.code, 1, r.out)
+    assert.ok(r.out.includes('every subjects[] entry must be'), r.out)
+  }
+})
+
 test('RED: a vacuous render (no markers) is a measurement FAIL, never a synthetic fallback', () => {
   const dir = fixture({
     budget: subjectsBudget(),
@@ -550,7 +622,7 @@ function runCli(subjectSource, cells, runs, { expect, markerScales } = {}) {
   return { code: res.status, out: `${res.stdout ?? ''}${res.stderr ?? ''}`, stdout: res.stdout ?? '' }
 }
 
-test('perf-subject-cli: a valid subject prints ONE {"samples":[…]} line of N numbers', () => {
+test('perf-subject-cli: a valid subject prints ONE {"samples":[…],"updateSamples":[…]} line of N numbers each', () => {
   const r = runCli(SUBJECT_SRC, 100, 5)
   assert.equal(r.code, 0, r.out)
   const lines = r.stdout.trim().split('\n')
@@ -558,6 +630,13 @@ test('perf-subject-cli: a valid subject prints ONE {"samples":[…]} line of N n
   const parsed = JSON.parse(lines[0])
   assert.equal(parsed.samples.length, 5, r.out)
   assert.ok(parsed.samples.every((s) => typeof s === 'number' && Number.isFinite(s)), r.out)
+  // The update phase re-renders the SAME mounted tree with a changed tick —
+  // one update sample per run, and the recount keeps its anti-vacuity teeth.
+  assert.equal(parsed.updateSamples.length, 5, r.out)
+  assert.ok(
+    parsed.updateSamples.every((s) => typeof s === 'number' && Number.isFinite(s)),
+    r.out,
+  )
 })
 
 test('perf-subject-cli G30: markers must SCALE with the declared cells — one row cannot pass', () => {

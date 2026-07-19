@@ -4,7 +4,8 @@
     {
       "subject": "apps/mobile/src/features/matrix/perfSubject.tsx",
       "cells": 10000,
-      "medianBudgetMs": 320
+      "medianBudgetMs": 320,
+      "medianUpdateBudgetMs": 400
     }
   ],
   "exempt": [],

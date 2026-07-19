@@ -309,39 +309,63 @@ function measureViaSubject(subjectRel, cells, runs, expect, markerScales) {
       /* not the samples line — keep scanning */
     }
   }
+  const isSampleRun = (arr) =>
+    Array.isArray(arr) &&
+    arr.length === runs &&
+    arr.every((s) => typeof s === 'number' && Number.isFinite(s))
   const okShape =
-    parsed !== undefined &&
-    Array.isArray(parsed.samples) &&
-    parsed.samples.length === runs &&
-    parsed.samples.every((s) => typeof s === 'number' && Number.isFinite(s))
+    parsed !== undefined && isSampleRun(parsed.samples) && isSampleRun(parsed.updateSamples)
   if (!okShape) {
     fail(
       GATE,
-      `the perf subject CLI did not emit a valid {"samples":[…]} line of ${runs} numbers (stdout: ${JSON.stringify((res.stdout ?? '').slice(0, 200))}) — measurement is unusable`,
+      `the perf subject CLI did not emit a valid {"samples":[…],"updateSamples":[…]} line of ${runs} numbers each (stdout: ${JSON.stringify((res.stdout ?? '').slice(0, 200))}) — measurement is unusable`,
     )
   }
-  const sorted = [...parsed.samples].sort((a, b) => a - b)
-  return { median: sorted[Math.floor(sorted.length / 2)], samples: parsed.samples }
+  const medianOf = (arr) => [...arr].sort((a, b) => a - b)[Math.floor(arr.length / 2)]
+  return {
+    median: medianOf(parsed.samples),
+    samples: parsed.samples,
+    updateMedian: medianOf(parsed.updateSamples),
+    updateSamples: parsed.updateSamples,
+  }
 }
 
 // Median-of-runs with the re-measure-once discipline, parameterized by subject
-// entry; fails the gate on two independent over-budget medians, otherwise
-// returns the human-readable detail line.
-/** @param {{ subject: string, cells: number, runs: number, medianBudgetMs: number, expect?: string, markerScales?: boolean }} entry */
-function measureWithRetry({ subject, cells, runs, medianBudgetMs, expect, markerScales }) {
-  let { median, samples } = measureViaSubject(subject, cells, runs, expect, markerScales)
+// entry; fails the gate on two independent over-budget medians (mount and —
+// when the entry declares medianUpdateBudgetMs — update each get the
+// discipline), otherwise returns the human-readable detail line. The update
+// median is always MEASURED and printed; it is asserted only when budgeted, so
+// an entry without the key keeps prior red/green behavior exactly.
+/** @param {{ subject: string, cells: number, runs: number, medianBudgetMs: number, medianUpdateBudgetMs?: number, expect?: string, markerScales?: boolean }} entry */
+function measureWithRetry({
+  subject,
+  cells,
+  runs,
+  medianBudgetMs,
+  medianUpdateBudgetMs,
+  expect,
+  markerScales,
+}) {
+  let measured = measureViaSubject(subject, cells, runs, expect, markerScales)
+  const overBudget = () =>
+    measured.median > medianBudgetMs ||
+    (medianUpdateBudgetMs !== undefined && measured.updateMedian > medianUpdateBudgetMs)
   let retried = false
-  if (median > medianBudgetMs) {
+  if (overBudget()) {
     // One full re-measure before failing: two independent over-budget medians
     // cannot both be scheduler noise.
     retried = true
-    ;({ median, samples } = measureViaSubject(subject, cells, runs, expect, markerScales))
+    measured = measureViaSubject(subject, cells, runs, expect, markerScales)
   }
-  const detail = `subject ${subject}, ${cells} cells, ${runs} runs${retried ? ' (re-measured once)' : ''}: median ${median.toFixed(1)}ms (budget ${medianBudgetMs}ms; samples ${samples.map((s) => s.toFixed(0)).join('/')}ms)`
-  if (median > medianBudgetMs) {
+  const updateBudgetNote =
+    medianUpdateBudgetMs === undefined ? '' : ` (budget ${medianUpdateBudgetMs}ms)`
+  const detail = `subject ${subject}, ${cells} cells, ${runs} runs${retried ? ' (re-measured once)' : ''}: median ${measured.median.toFixed(1)}ms (budget ${medianBudgetMs}ms; samples ${measured.samples.map((s) => s.toFixed(0)).join('/')}ms), update median ${measured.updateMedian.toFixed(1)}ms${updateBudgetNote}`
+  if (overBudget()) {
+    const which =
+      measured.median > medianBudgetMs ? 'render (mount) cost' : 'update (re-render) cost'
     fail(
       GATE,
-      `${detail} — render cost regressed past the budget twice in a row. Find the regression (or, after a DELIBERATE change to the subject, re-baseline ${BUDGET_PATH} in a reviewed commit).`,
+      `${detail} — ${which} regressed past the budget twice in a row. Find the regression (or, after a DELIBERATE change to the subject, re-baseline ${BUDGET_PATH} in a reviewed commit).`,
     )
   }
   return detail
@@ -372,7 +396,7 @@ if (typeof runs !== 'number' || runs <= 0) {
   )
 }
 const ENTRY_SHAPE =
-  '{ "subject": non-empty string, "cells": positive number, "medianBudgetMs": positive number, "expect"?: non-empty string }'
+  '{ "subject": non-empty string, "cells": positive number, "medianBudgetMs": positive number, "medianUpdateBudgetMs"?: positive number, "expect"?: non-empty string }'
 if (!Array.isArray(budget.subjects) || budget.subjects.length === 0) {
   fail(
     GATE,
@@ -389,6 +413,8 @@ for (const entry of budget.subjects) {
     entry.cells > 0 &&
     typeof entry.medianBudgetMs === 'number' &&
     entry.medianBudgetMs > 0 &&
+    (entry.medianUpdateBudgetMs === undefined ||
+      (typeof entry.medianUpdateBudgetMs === 'number' && entry.medianUpdateBudgetMs > 0)) &&
     (entry.expect === undefined ||
       (typeof entry.expect === 'string' && entry.expect.trim() !== '')) &&
     (entry.markerScales === undefined || typeof entry.markerScales === 'boolean')
@@ -558,6 +584,7 @@ const details = budget.subjects.map((entry) =>
     cells: entry.cells,
     runs,
     medianBudgetMs: entry.medianBudgetMs,
+    medianUpdateBudgetMs: entry.medianUpdateBudgetMs,
     expect: entry.expect ?? DEFAULT_EXPECT,
     markerScales: entry.markerScales,
   }),

@@ -17,15 +17,26 @@ import { MATRIX_COLUMNS, makeSyntheticRows } from './matrixData'
 //   3. Rows come from makeSyntheticRows (seeded PRNG): the same N renders the
 //      same tree every run, on every machine — a budget over nondeterministic
 //      content would measure the content, not the renderer.
+//   4. `tick` (0.1.2, optional) is the UPDATE-phase handle: the harness
+//      re-renders the mounted tree with a changed tick per run and times the
+//      reconciliation pass. Rendering it into the grid's testID keeps the
+//      update observable — and because props change every update, wrapping the
+//      subject in React.memo cannot fake a fast update either.
 //
 // Nothing reachable from the app shell imports this module (bundle purity — the
 // subject exists for its unit test and the perf gate's harness only).
-export function PerfSubject({ cells }: { readonly cells: number }) {
+export function PerfSubject({
+  cells,
+  tick = 0,
+}: {
+  readonly cells: number
+  readonly tick?: number
+}) {
   const columnCount = MATRIX_COLUMNS.length
   const rowCount = Math.max(1, Math.round(cells / columnCount))
   const rows = makeSyntheticRows(rowCount)
   return (
-    <View role="grid">
+    <View role="grid" testID={`perf-grid-${String(tick)}`}>
       {rows.map((row) => (
         <View key={row.id} role="row">
           <Text role="rowheader">{row.label}</Text>

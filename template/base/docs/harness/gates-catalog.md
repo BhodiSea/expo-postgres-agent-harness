@@ -287,17 +287,26 @@ Median-of-N full react-test-renderer mount time over REAL feature subjects,
 asserted against `tools/perf-budget.json` (write-guard-protected; raising a budget
 is a reviewed human decision). A red requires TWO independent over-budget medians
 (one automatic re-measure), so scheduler noise cannot fail a turn while a genuine
-10× regression still cannot pass. One budget shape — `subjects: [{ subject, cells,
-medianBudgetMs, expect? }]` under one shared `runs` — and it arms the
+10× regression still cannot pass. The UPDATE phase (0.1.2): after each timed
+mount the harness re-renders the SAME mounted tree with a changed `tick` prop
+and times the reconciliation pass — the re-render cost a mount-only benchmark
+never sees, and because props change every update a `React.memo` wrapper cannot
+fake a fast one. The update median is always measured and printed; it is
+ASSERTED only when the entry declares `medianUpdateBudgetMs` (seeded ~10× the
+fresh-scaffold update median, same doctrine as the mount budget), and the
+updated tree must still carry the scaled markers. One budget shape — `subjects:
+[{ subject, cells, medianBudgetMs, medianUpdateBudgetMs?, expect? }]` under one
+shared `runs` — and it arms the
 DENSE-FEATURE CLOSURE: every `features/*` dir importing `useKeysetQuery` must ship
 a `perfSubject.tsx` declared in `subjects[]`; declared-but-missing and
 present-but-undeclared both red (`features/matrix/perfSubject.tsx` is the worked
 pattern — an island reachable only from tests and this gate). This is the
 RELATIVE, deterministic canary; absolute startup/UX numbers live in the CI device
 lane (mobile-perf), never in the chain.
-**Anti-vacuity:** slow the row render 10× → FAIL twice-measured; add a features
-dir importing `useKeysetQuery` with no perfSubject → FAIL with the create-FIX
-line; declare a subject that does not exist → FAIL naming it.
+**Anti-vacuity:** slow the row render 10× → FAIL twice-measured; slow only the
+UPDATE path → FAIL naming the re-render cost; add a features dir importing
+`useKeysetQuery` with no perfSubject → FAIL with the create-FIX line; declare a
+subject that does not exist → FAIL naming it.
 
 ### 19. route-manifest — `node tools/check-route-manifest.mjs`
 

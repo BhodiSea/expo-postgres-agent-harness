@@ -49,10 +49,12 @@
 // RN role the matrix subject stamps on every cell). It travels via ENVIRONMENT,
 // not argv, so a quoted marker can never be mangled by argv joining, and the
 // contract stays identical to the desktop-era gate's. On success it prints
-// EXACTLY one JSON line `{"samples":[ms,…]}` (runs entries) and exits 0. Any
-// problem — bad argv, missing PerfSubject export, or a vacuous render (marker
-// absent or not scaling with the declared cells) — exits 1 with a reason on
-// stderr. The gate treats a non-zero exit or an unparseable line as a hard FAIL,
+// EXACTLY one JSON line `{"samples":[ms,…],"updateSamples":[ms,…]}` (runs
+// entries each: mount cost, then the cost of re-rendering the SAME mounted tree
+// with a changed `tick` prop — the update path a mount-only benchmark never
+// sees). Any problem — bad argv, missing PerfSubject export, or a vacuous
+// render (marker absent or not scaling with the declared cells) — exits 1 with
+// a reason on stderr. The gate treats a non-zero exit or an unparseable line as a hard FAIL,
 // never a silent fallback to a synthetic measurement.
 // SOURCE: docs/harness/gates-catalog.md (perf-budget gate) [corpus: harness/doctrine]
 import { existsSync, readFileSync } from 'node:fs'
@@ -278,15 +280,30 @@ function main() {
   // Warmup: JIT + module init noise stays out of the measured runs.
   for (let i = 0; i < 2; i += 1) unmount(mount())
   const samples = []
+  const updateSamples = []
   for (let i = 0; i < runs; i += 1) {
     const start = performance.now()
     const renderer = mount()
     samples.push(performance.now() - start)
     assertNotVacuous(countMarkers(renderer.toJSON(), prop, value))
+    // UPDATE phase (0.1.2): re-render the SAME mounted tree with a changed
+    // `tick` prop. Props differ on every update, so a memo bailout at the root
+    // is impossible by construction — the timed window is a full reconciliation
+    // pass over the mounted tree, the cost a mount-only benchmark never sees
+    // (mount builds fibers; update diffs them). Subjects may ignore `tick`
+    // entirely — receiving an unknown prop is free.
+    const updateStart = performance.now()
+    act(() => {
+      renderer.update(React.createElement(PerfSubject, { cells, tick: i + 1 }))
+    })
+    updateSamples.push(performance.now() - updateStart)
+    // The updated tree must still carry the scaled markers — an update that
+    // blanked the workload would measure nothing.
+    assertNotVacuous(countMarkers(renderer.toJSON(), prop, value))
     unmount(renderer)
   }
 
-  process.stdout.write(`${JSON.stringify({ samples })}\n`)
+  process.stdout.write(`${JSON.stringify({ samples, updateSamples })}\n`)
 }
 
 try {
