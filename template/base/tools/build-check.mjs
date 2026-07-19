@@ -134,6 +134,36 @@ if (existsSync(BUDGET_FILE)) {
       `${dist}/${biggestAsset.rel}: ${kb(biggestAsset.gzipBytes).toFixed(1)} KB gzip exceeds the ${String(budget.largestAssetGzipKb)} KB per-asset budget`,
     )
   }
+
+  // Per-image budgets (0.1.2, all optional — absent keys keep prior behavior
+  // byte-identical). Images are classified by MAGIC BYTES (content-addressed
+  // assets have no extensions) and measured RAW: compressed image formats
+  // barely gzip, so raw bytes are what the device stores and decodes.
+  const images = measured.files.filter((f) => f.imageFormat !== null)
+  const biggestImage = [...images].sort((a, b) => b.rawBytes - a.rawBytes)[0]
+  if (
+    typeof budget.largestImageKb === 'number' &&
+    biggestImage !== undefined &&
+    kb(biggestImage.rawBytes) > budget.largestImageKb
+  ) {
+    hits.push(
+      `${dist}/${biggestImage.rel}: ${kb(biggestImage.rawBytes).toFixed(1)} KB raw ${biggestImage.imageFormat} exceeds the ${String(budget.largestImageKb)} KB per-image budget (${BUDGET_FILE}) — resize/recompress the source asset (screens never need more pixels than they paint)`,
+    )
+  }
+  if (typeof budget.maxImageCount === 'number' && images.length > budget.maxImageCount) {
+    hits.push(
+      `bundle ships ${String(images.length)} image file(s), over the maxImageCount ${String(budget.maxImageCount)} (${BUDGET_FILE}) — audit what rode in (unused densities, stray art, screenshots)`,
+    )
+  }
+  if (typeof budget.pngOverKbPreferWebp === 'number') {
+    for (const img of images) {
+      if (img.imageFormat === 'png' && kb(img.rawBytes) > budget.pngOverKbPreferWebp) {
+        hits.push(
+          `${dist}/${img.rel}: ${kb(img.rawBytes).toFixed(1)} KB PNG exceeds the ${String(budget.pngOverKbPreferWebp)} KB PNG threshold (${BUDGET_FILE}) — convert the source to WebP (lossless WebP decodes natively on both RN platforms and typically cuts PNG bytes by a quarter or more), or keep the PNG deliberately by raising the threshold in review`,
+        )
+      }
+    }
+  }
 } else {
   hits.push(
     `${BUDGET_FILE} missing — the bundle has no byte budget; restore it (write-guard-protected data)`,

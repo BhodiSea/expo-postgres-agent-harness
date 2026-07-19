@@ -30,6 +30,7 @@ import { gzipSync } from 'node:zlib'
 import {
   composeBaseline,
   diffBaseline,
+  imageFormatOf,
   measureDist,
   parseBaseline,
   ratchetFindings,
@@ -59,7 +60,8 @@ const ASSET_BYTES = gz(DIST_FILES[`assets/${HASH_B}`])
 const GENEROUS_BUDGET = { totalGzipKb: 250, largestChunkGzipKb: 180, largestAssetGzipKb: 100 }
 
 /**
- * @param {{ budget?: object | null, baseline?: object | string, dist?: Record<string, string> | null,
+ * @param {{ budget?: object | null, baseline?: object | string,
+ *           dist?: Record<string, string | Buffer> | null,
  *           nodeModules?: boolean, exportExit?: number }} [opts]
  */
 function fixture({
@@ -206,6 +208,53 @@ test('purity: every forbidden marker in an emitted file reds naming file, marker
   }
 })
 
+// ── per-image budgets (0.1.2): magic-byte classification, raw-size caps ──────
+const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+const fakePng = (kb) => Buffer.concat([PNG_MAGIC, Buffer.alloc(kb * 1024, 7)])
+const fakeJpeg = (kb) => Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(kb * 1024, 9)])
+
+test('RED image budgets: an oversized image reds raw-named; a PNG over threshold gets the WebP fix', () => {
+  const dist = { ...DIST_FILES, [`assets/${HASH_A}`]: fakePng(8) }
+  const largest = runGate(
+    fixture({ dist, budget: { ...GENEROUS_BUDGET, largestImageKb: 4 } }),
+  )
+  assert.equal(largest.code, 1, largest.out)
+  assert.ok(largest.out.includes(`assets/${HASH_A}`), largest.out)
+  assert.ok(largest.out.includes('raw png exceeds the 4 KB per-image budget'), largest.out)
+
+  const webp = runGate(
+    fixture({ dist, budget: { ...GENEROUS_BUDGET, pngOverKbPreferWebp: 4 } }),
+  )
+  assert.equal(webp.code, 1, webp.out)
+  assert.ok(webp.out.includes('PNG exceeds the 4 KB PNG threshold'), webp.out)
+  assert.ok(webp.out.includes('convert the source to WebP'), webp.out)
+
+  // The same bytes as a JPEG trip neither the PNG threshold nor the (higher) cap.
+  const jpegDist = { ...DIST_FILES, [`assets/${HASH_A}`]: fakeJpeg(8) }
+  const jpegGreen = runGate(
+    fixture({
+      dist: jpegDist,
+      budget: { ...GENEROUS_BUDGET, largestImageKb: 16, pngOverKbPreferWebp: 4 },
+    }),
+  )
+  assert.equal(jpegGreen.code, 0, jpegGreen.out)
+})
+
+test('RED maxImageCount: more shipped images than budgeted reds with the audit hint; text assets never count', () => {
+  const dist = {
+    ...DIST_FILES,
+    [`assets/${HASH_A}`]: fakePng(1),
+    'assets/deadbeefdeadbeefdeadbeefdeadbeef': fakeJpeg(1),
+  }
+  const red = runGate(fixture({ dist, budget: { ...GENEROUS_BUDGET, maxImageCount: 1 } }))
+  assert.equal(red.code, 1, red.out)
+  assert.ok(red.out.includes('2 image file(s), over the maxImageCount 1'), red.out)
+
+  // The default DIST_FILES carry no image magic bytes — count 0, always green.
+  const green = runGate(fixture({ budget: { ...GENEROUS_BUDGET, maxImageCount: 0 } }))
+  assert.equal(green.code, 0, green.out)
+})
+
 test('RED: tools/bundle-budget.json missing — the bundle must never lack a byte budget', () => {
   const r = runGate(fixture({ budget: null }))
   assert.equal(r.code, 1, r.out)
@@ -305,6 +354,20 @@ test('measureDist: unhashed names pass through; same logical key sums; a non-has
   ])
   assert.equal(m.chunks['ios/entry.hbc'], gz('one, platform keys apart\n') + gz('two, same logical key sums\n'))
   assert.equal(m.chunks.assets, gz('asset one\n') + gz('asset two\n'))
+})
+
+test('imageFormatOf: magic bytes classify png/jpeg/gif/webp; everything else is null', () => {
+  assert.equal(imageFormatOf(fakePng(1)), 'png')
+  assert.equal(imageFormatOf(fakeJpeg(1)), 'jpeg')
+  assert.equal(imageFormatOf(Buffer.from('GIF89a....')), 'gif')
+  assert.equal(
+    imageFormatOf(Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WEBPVP8 ')])),
+    'webp',
+  )
+  assert.equal(imageFormatOf(Buffer.from('hermes bytecode or text')), null)
+  assert.equal(imageFormatOf(Buffer.alloc(0)), null)
+  // A truncated signature never misclassifies.
+  assert.equal(imageFormatOf(PNG_MAGIC.subarray(0, 3)), null)
 })
 
 test('parseBaseline: accepts the shipped shape; rejects every malformed variant with a named reason', () => {

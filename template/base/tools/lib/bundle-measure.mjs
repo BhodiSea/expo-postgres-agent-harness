@@ -65,6 +65,30 @@ const isBundleChunk = (rel) => rel.startsWith('_expo/static/js/')
 const isAsset = (rel) => rel.startsWith('assets/')
 const ASSETS_KEY = 'assets'
 
+// Magic-byte image sniffing: content-addressed assets carry NO extension (the
+// hash is the filename), so the leading bytes are the only honest classifier.
+// Covers the four formats Metro bundles for RN image sources.
+// SOURCE: PNG signature (ISO/IEC 15948 §5.2), JPEG SOI marker, GIF87a/89a
+// header, WebP RIFF container — first-bytes file identification
+// https://developer.mozilla.org/en-US/docs/Web/Media/Formats/Image_types
+export function imageFormatOf(buffer) {
+  if (buffer.length >= 8 && buffer[0] === 0x89 && buffer.toString('latin1', 1, 4) === 'PNG') {
+    return 'png'
+  }
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return 'jpeg'
+  }
+  if (buffer.length >= 4 && buffer.toString('latin1', 0, 4) === 'GIF8') return 'gif'
+  if (
+    buffer.length >= 12 &&
+    buffer.toString('latin1', 0, 4) === 'RIFF' &&
+    buffer.toString('latin1', 8, 12) === 'WEBP'
+  ) {
+    return 'webp'
+  }
+  return null
+}
+
 // Walk the emitted dist/ EXHAUSTIVELY (same no-exclude contract as the purity
 // scan) and gzip every file: totalBytes is the ratchet's primary invariant;
 // chunks maps each logical bundle key to its gzip bytes (two files stripping
@@ -74,8 +98,16 @@ const ASSETS_KEY = 'assets'
 export function measureDist(dist) {
   const files = []
   for (const rel of walkFiles(dist)) {
-    const gzipBytes = gzipSync(readFileSync(`${dist}/${rel}`)).length
-    files.push({ rel, gzipBytes, isBundle: isBundleChunk(rel) })
+    const buffer = readFileSync(`${dist}/${rel}`)
+    files.push({
+      rel,
+      gzipBytes: gzipSync(buffer).length,
+      // Raw bytes + sniffed format feed the per-image budgets: images ship
+      // stored (compressed formats barely gzip), so raw is the honest size.
+      rawBytes: buffer.length,
+      imageFormat: imageFormatOf(buffer),
+      isBundle: isBundleChunk(rel),
+    })
   }
   const chunks = {}
   for (const f of files) {
