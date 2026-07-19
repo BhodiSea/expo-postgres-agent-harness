@@ -17,4 +17,4 @@ authors:
   - name: Cogvera Labs
 repository-code: 'https://github.com/BhodiSea/expo-postgres-agent-harness'
 license: Apache-2.0
-version: 0.1.0
+version: 0.1.1

@@ -51,6 +51,10 @@ jobs:
           node-version: 22
       - run: node scripts/check-syntax.mjs
       - run: node scripts/hygiene.mjs
+      # Release lockstep on every PR: version skew between package.json, the
+      # plugin manifest, the hook stamps, CITATION.cff, and the CHANGELOG must
+      # red the PR that introduces it, not the eventual tag build.
+      - run: node scripts/check-release-lockstep.mjs
       # Plugin manifests + the shipped agent roster, validated at their SOURCE:
       # plugin.json/marketplace.json reference only files that exist (dangling
       # paths are dead on install), and every reviewer agent stays read-only by

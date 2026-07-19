@@ -85,9 +85,47 @@ been measured on this port yet, and unmeasured numbers do not ship.
 
 ## Install
 
+### Scaffold an app
+
 ```sh
 npx --yes github:BhodiSea/expo-postgres-agent-harness init
 ```
+
+### Use this template — fork the harness itself
+
+This repository is a GitHub **template repository**. "Use this template"
+produces your own copy of the *harness* — installer, `template/`, selftest
+machinery — to rebrand and extend into a sibling lineage; it does **not**
+produce an app (the npx path above does that). A template copy starts from a
+single commit with no upstream history or tags, and the selftest, hygiene, and
+lint workflows run owner-agnostically in the copy.
+
+The shipped `template/` tree needs no rebranding — it is placeholder-clean, and
+the hygiene gate denies upstream references inside it. What does need rewriting
+in a copy is the checklist of repo-root sites that hardcode the upstream owner:
+
+- `package.json` — `repository.url`
+- `README.md` — the npx command above, the sibling-harness link in the status
+  note, and this checklist
+- `CITATION.cff` — `title`, `authors`, `repository-code`
+- `SECURITY.md` — the advisories URL and the `update` command
+- `.claude-plugin/plugin.json` — the npx command in `description`, `author`
+- `.claude-plugin/marketplace.json` — `owner`
+- `scripts/check-corpus-fidelity.mjs` — the User-Agent contact URL
+- `installer/lib/detect.mjs` — the sibling-harness redirect messages
+- `scripts/hygiene.mjs` — **keep** the upstream-handle deny pattern (it stops
+  upstream references from ever entering your `template/`) and add your own
+  handle alongside it; likewise keep the upstream copyright notices
+  (`REUSE.toml`, `LICENSES/`) and append your own.
+
+Then prove closure the way the harness proves everything else:
+
+```sh
+grep -rn "BhodiSea\|Cogvera" --exclude-dir=node_modules .
+```
+
+should return only the attribution you deliberately kept and the hygiene deny
+pattern.
 
 ## Layout
 

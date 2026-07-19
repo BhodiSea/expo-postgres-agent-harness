@@ -4,6 +4,35 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] — 2026-07-19
+
+Patch release: the repository is now a GitHub template repository, and the
+release-lockstep check runs on every PR instead of only at tag time. No gate,
+hook, or installer behavior changes for consumers beyond the version stamps.
+
+### Added
+
+- README: the Install section now documents both acquisition paths — the npx
+  installer that scaffolds an app, and the GitHub "Use this template" button
+  that produces your own copy of the harness itself to rebrand and extend into
+  a sibling lineage — plus an owner-rebrand checklist covering every repo-root
+  site that hardcodes the upstream owner, closed by a grep one-liner. (The
+  shipped `template/` tree needs no rebranding: it is placeholder-clean, and
+  the hygiene gate denies upstream references inside it.)
+- `scripts/check-release-lockstep.mjs` is wired into the selftest matrix's
+  installer-unit job, making its "asserted on every PR" header claim true:
+  version skew between `package.json`, the plugin manifest, the hook stamps,
+  `CITATION.cff`, and the CHANGELOG previously merged silently and only redded
+  at tag time in `release.yml`.
+- CONTRIBUTING's release runbook now lists the full lockstep surface (plugin
+  manifest, CITATION.cff, and the five hook stamps in addition to CHANGELOG
+  and `package.json`) plus the pre-tag verification command.
+
+### Changed
+
+- The repository is flagged as a GitHub template repository — "Use this
+  template" yields a harness fork to make your own, not a scaffolded app.
+
 ## [0.1.0] — 2026-07-18
 
 Initial development release, under construction: the sibling

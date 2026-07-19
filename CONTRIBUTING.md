@@ -54,7 +54,12 @@ github:…` never installs them.
 
 ## Releases
 
-1. Add a `## [x.y.z]` section to `CHANGELOG.md`.
-2. Bump `version` in `package.json`.
-3. Tag `vx.y.z` and push — `release.yml` verifies the changelog, packs, attests
-   provenance, and publishes the GitHub Release.
+1. Add a `## [x.y.z] — YYYY-MM-DD` section to `CHANGELOG.md`.
+2. Bump the version everywhere the lockstep gate looks: `package.json`,
+   `.claude-plugin/plugin.json`, `CITATION.cff`, and the five
+   `HARNESS_HOOK_VERSION` stamps under `template/base/.claude/hooks/`.
+3. Run `node scripts/check-release-lockstep.mjs` — the same check runs on every
+   PR in the selftest matrix and again at tag time.
+4. Tag `vx.y.z` and push — `release.yml` re-runs the gates, waits for a green
+   selftest matrix on the tagged SHA, verifies the changelog section, packs,
+   attests provenance, and publishes the GitHub Release.

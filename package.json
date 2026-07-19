@@ -1,6 +1,6 @@
 {
   "name": "expo-postgres-agent-harness",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Deterministic agent harness for Expo (React Native) + Hono + Drizzle/Postgres 16 pnpm monorepos shipped to the App Store and Google Play via EAS: Claude Code hooks, security-invariant lint gates, RLS isolation tests against real Postgres, Expo config/ATS/permissions policy gates, provenance pipeline, and supply-chain-hardened CI — installable into any new or existing project.",
   "license": "Apache-2.0",
   "repository": {
