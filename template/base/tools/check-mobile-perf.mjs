@@ -219,6 +219,7 @@ for (const [id, spec] of Object.entries(screens)) {
   const overTotal = r.totalTimeMs > spec.maxTotalTimeMs
   rows.push(
     `  ${id.padEnd(16)} cold-start ${String(r.totalTimeMs).padStart(7)}ms (cap ${String(spec.maxTotalTimeMs)}ms)` +
+      `${isMs(r.warmTotalTimeMs) ? `  warm ${String(r.warmTotalTimeMs)}ms (cap ${String(spec.maxWarmTotalTimeMs ?? '—')}ms)` : ''}` +
       `${isMs(r.fullyDrawnMs) ? `  fully-drawn ${String(r.fullyDrawnMs)}ms (cap ${String(spec.maxFullyDrawnMs ?? '—')}ms)` : ''}` +
       `${overTotal ? '  <-- OVER' : ''}`,
   )
@@ -239,6 +240,21 @@ for (const [id, spec] of Object.entries(screens)) {
       bad.push(
         `${id}: fully-drawn ${String(r.fullyDrawnMs)}ms exceeds its ${String(spec.maxFullyDrawnMs)}ms budget — content readiness regressed ` +
           'even if the first frame stayed fast.',
+      )
+    }
+  }
+  // The warm split (0.1.2): enforced ONLY for rows that declare the cap — the
+  // exact maxFullyDrawnMs convention, including the declared-but-unreported
+  // red (a warm start does not always print TotalTime; a declared cap that
+  // silently measures nothing is a gate that turned itself off).
+  if (typeof spec.maxWarmTotalTimeMs === 'number') {
+    if (!isMs(r.warmTotalTimeMs)) {
+      bad.push(
+        `${id}: ${BUDGET} caps warm starts (${String(spec.maxWarmTotalTimeMs)}ms) but the lane reported no warmTotalTimeMs — the warm launch printed no TotalTime, so the cap is enforced against nothing. Investigate the lane, or null the cap in a reviewed commit.`,
+      )
+    } else if (r.warmTotalTimeMs > spec.maxWarmTotalTimeMs) {
+      bad.push(
+        `${id}: warm start ${String(r.warmTotalTimeMs)}ms exceeds its ${String(spec.maxWarmTotalTimeMs)}ms budget — the resume path regressed (cold-start numbers cannot see it).`,
       )
     }
   }

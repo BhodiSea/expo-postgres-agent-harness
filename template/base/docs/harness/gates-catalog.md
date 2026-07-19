@@ -509,11 +509,19 @@ flow and budget row; leave a stale row for a deleted route → FAIL.
   Path-filtered + nightly (emulator cost); anti-vacuity: a phase that executed
   zero flows exits red, and evidence (Maestro debug output, screenshot, logcat
   tail) uploads on every failure.
-- **Startup measurement lane** (`perf-lane`) — `tools/measure-startup.mjs` cold-
-  starts every ROUTES entry on its own quiet emulator (`am force-stop` +
-  `am start -W` per deep link), writes `artifacts/perf-results.json`, and
-  `HARNESS_PERF_LANE=1 node tools/check-mobile-perf.mjs` enforces
-  `tools/startup-budget.json` — failing CLOSED if the artifact is missing.
+- **Startup measurement lane** (`perf-lane`) — `tools/measure-startup.mjs`
+  cold-starts every ROUTES entry ×3 on its own quiet emulator (`am force-stop`
+  + `am start -W` per deep link; `totalTimeMs` is the MEDIAN, every roll
+  recorded in `coldSamplesMs`), then one WARM start per route (HOME +
+  relaunch; `warmTotalTimeMs`, capped only by rows declaring
+  `maxWarmTotalTimeMs` — a declared-but-unreported cap reds), writes
+  `artifacts/perf-results.json`, and `HARNESS_PERF_LANE=1 node
+  tools/check-mobile-perf.mjs` enforces `tools/startup-budget.json` — failing
+  CLOSED if the artifact is missing. Honest limit: `fullyDrawnMs` stays absent
+  in the managed scaffold (no RN/Expo binding for `reportFullyDrawn()`;
+  injecting native source would break CNG purity) — the median + warm split is
+  the managed replacement, and the parse stays armed for consumers that add a
+  native binding.
 - **mutation** — `pnpm mutation` (StrykerJS over the critical surface —
   authorization and transport boundary code), a SET-based ratchet against
   `tools/mutation-baseline.json`: a NEW surviving mutant reds; accepting one is a

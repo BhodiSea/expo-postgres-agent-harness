@@ -254,6 +254,33 @@ test('RED measurement: fullyDrawn caps enforce both halves — over-cap, and cap
   assert.ok(r.out.includes('reportFullyDrawn()'), r.out)
 })
 
+test('RED measurement: warm caps (0.1.2) enforce both halves — over-cap, and cap-with-no-report', () => {
+  const budget = budgetWith((b) => {
+    b.screens.home.maxWarmTotalTimeMs = 100
+    b.screens.matrix.maxWarmTotalTimeMs = 100
+  })
+  const results = structuredClone(GREEN_RESULTS)
+  results.screens.home.warmTotalTimeMs = 500 // over the cap
+  // matrix reports none while the budget caps it — a warm launch does not
+  // always print TotalTime; a declared cap enforced against nothing must red.
+  const r = runGate(fixture({ budget, results }))
+  assert.equal(r.code, 1, r.out)
+  assert.ok(r.out.includes('home: warm start 500ms exceeds its 100ms budget'), r.out)
+  assert.ok(r.out.includes('matrix: tools/startup-budget.json caps warm starts (100ms)'), r.out)
+
+  // Undeclared caps ignore the reported warm numbers entirely.
+  const green = runGate(
+    fixture({
+      results: (() => {
+        const ok = structuredClone(GREEN_RESULTS)
+        ok.screens.home.warmTotalTimeMs = 999999
+        return ok
+      })(),
+    }),
+  )
+  assert.equal(green.code, 0, green.out)
+})
+
 test('RED measurement: a corrupt artifact fails loud, and a screens-less one names the contract', () => {
   const corrupt = runGate(fixture({ results: '{ not json' }))
   assert.equal(corrupt.code, 1, corrupt.out)

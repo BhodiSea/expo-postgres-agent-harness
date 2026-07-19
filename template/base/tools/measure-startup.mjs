@@ -5,19 +5,30 @@
 // tools/startup-budget.json. This script MEASURES and RECORDS; the gate JUDGES — the
 // split keeps the budget arithmetic (and its fail-closed rules) in exactly one place.
 //
-// Per route: `adb shell am force-stop <appId>` (a true cold start, not a resume),
-// `adb logcat -c` (so a Fully-drawn line can only come from THIS start), then
+// Per route, COLD_RUNS true cold starts: `adb shell am force-stop <appId>` (a real
+// cold start, not a resume), `adb logcat -c` (so a Fully-drawn line can only come
+// from THIS start), then
 // `adb shell am start -W -a android.intent.action.VIEW -d <scheme>://<path> <appId>` —
 // the -W TotalTime is approximately the logcat Displayed TTID (design record:
-// CI-LANE-FACTS). fullyDrawnMs is recorded only when the app actually called
-// reportFullyDrawn() (`adb logcat -d` → "Fully drawn <appId>/…: +1s54ms"); the shipped
-// app does not call it yet, so its absence is honest — check-mobile-perf enforces a
-// fullyDrawn cap only for budget rows that declare one.
+// CI-LANE-FACTS). totalTimeMs is the MEDIAN of the cold runs (0.1.2 — a single
+// emulator start on a shared runner is one scheduler roll; three rolls make the
+// step-function detector honest without meaningfully lengthening the lane), and
+// coldSamplesMs records every roll. fullyDrawnMs is recorded only when the app
+// actually called reportFullyDrawn() (`adb logcat -d` → "Fully drawn <appId>/…:
+// +1s54ms"). HONEST LIMIT: the managed scaffold CANNOT call reportFullyDrawn() —
+// no RN core or Expo SDK module binds Activity.reportFullyDrawn, and injecting
+// native source would break CNG purity — so fullyDrawnMs stays absent here by
+// construction; the parse stays armed for consumers that add a native binding,
+// and check-mobile-perf enforces a fullyDrawn cap only for rows that declare one.
 //
-// One measured start per route, deliberately: the budgets are GENEROUS step-function
-// detectors (see startup-budget.json's doctrine), and N-run medians would spend lane
-// minutes to sharpen a number the gate never reads finely.
-// SOURCE: https://developer.android.com/topic/performance/vitals/launch-time (am start -W / TTID / reportFullyDrawn)
+// After the cold runs, ONE warm start (0.1.2): HOME (keyevent 3, so the process
+// survives but the activity leaves the foreground) then the same `am start -W`.
+// A warm/hot launch does not always print TotalTime (a delivery to the existing
+// top activity reports only WaitTime) — when it does not, warmTotalTimeMs is
+// simply omitted and the lane notes it: check-mobile-perf reds a declared
+// maxWarmTotalTimeMs with no reported number (the maxFullyDrawnMs convention),
+// and rows that never declare one lose nothing.
+// SOURCE: https://developer.android.com/topic/performance/vitals/launch-time (am start -W / TTID / warm-hot launch states / reportFullyDrawn)
 import { spawnSync } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
@@ -31,6 +42,9 @@ const IDENTITY_LOCK = 'tools/identity.lock.json'
 const RESULTS = 'artifacts/perf-results.json'
 // The launch itself is bounded by -W; this bounds a wedged adb.
 const ADB_TIMEOUT_MS = 3 * 60 * 1000
+// Median-of-3: enough rolls to shrug one scheduler spike, cheap enough that the
+// lane's wall clock stays dominated by the emulator boot, not the measurement.
+const COLD_RUNS = 3
 
 const quoted = (s) => JSON.stringify(String(s))
 function sh(command) {
@@ -94,32 +108,59 @@ if (invokedDirectly) {
     skipOrFail(GATE, 'no adb device answers — the startup measurement needs the lane emulator')
   }
 
-  /** @type {Record<string, { totalTimeMs: number, fullyDrawnMs?: number }>} */
+  /** @type {Record<string, { totalTimeMs: number, coldSamplesMs: number[], warmTotalTimeMs?: number, fullyDrawnMs?: number }>} */
   const screens = {}
-  for (const route of routes) {
-    const uri = deepLink(identity.scheme, route.path)
-    adbOrDie(`adb shell am force-stop ${quoted(identity.appId)}`, route.id)
-    adbOrDie('adb logcat -c', route.id)
-    const out = adbOrDie(
-      `adb shell am start -W -a android.intent.action.VIEW -d ${quoted(uri)} ${quoted(identity.appId)}`,
-      route.id,
-    )
-    const totalTimeMs = parseTotalTimeMs(out)
-    if (totalTimeMs === null) {
-      console.error(out.split('\n').slice(-20).join('\n'))
-      fail(
-        GATE,
-        `route '${route.id}': \`am start -W\` printed no TotalTime — the launch did not complete (wrong appId? unresolved deep link ${uri}?), so this screen is UNMEASURED and the lane must red`,
-      )
-    }
+  const settleMs = Number(process.env.HARNESS_SETTLE_MS ?? '') || 2000
+  const settle = () => {
     // A short settle so a reportFullyDrawn() fired just after the -W return still
     // lands (HARNESS_SETTLE_MS trims it in the stub-adb test harness).
-    const settleMs = Number(process.env.HARNESS_SETTLE_MS ?? '') || 2000
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, settleMs)
-    const fullyDrawnMs = parseFullyDrawnMs(sh('adb logcat -d').stdout ?? '', identity.appId)
-    screens[route.id] = fullyDrawnMs === null ? { totalTimeMs } : { totalTimeMs, fullyDrawnMs }
+  }
+  for (const route of routes) {
+    const uri = deepLink(identity.scheme, route.path)
+    const startCmd = `adb shell am start -W -a android.intent.action.VIEW -d ${quoted(uri)} ${quoted(identity.appId)}`
+    const coldSamplesMs = []
+    let fullyDrawnMs = null
+    for (let run = 0; run < COLD_RUNS; run += 1) {
+      adbOrDie(`adb shell am force-stop ${quoted(identity.appId)}`, route.id)
+      adbOrDie('adb logcat -c', route.id)
+      const out = adbOrDie(startCmd, route.id)
+      const sampleMs = parseTotalTimeMs(out)
+      if (sampleMs === null) {
+        console.error(out.split('\n').slice(-20).join('\n'))
+        fail(
+          GATE,
+          `route '${route.id}' (cold run ${String(run + 1)}/${String(COLD_RUNS)}): \`am start -W\` printed no TotalTime — the launch did not complete (wrong appId? unresolved deep link ${uri}?), so this screen is UNMEASURED and the lane must red`,
+        )
+      }
+      coldSamplesMs.push(sampleMs)
+      settle()
+      // Each run clears logcat, so the LAST run's Fully-drawn line (when the app
+      // ever gains a native reportFullyDrawn binding) is unambiguous.
+      fullyDrawnMs = parseFullyDrawnMs(sh('adb logcat -d').stdout ?? '', identity.appId)
+    }
+    const totalTimeMs = [...coldSamplesMs].sort((a, b) => a - b)[Math.floor(COLD_RUNS / 2)]
+
+    // The warm split: process alive (no force-stop), activity backgrounded via
+    // HOME, then the same launch. TotalTime is not guaranteed on a warm/hot
+    // delivery — absence is recorded as absence, never invented.
+    adbOrDie('adb shell input keyevent 3', route.id)
+    const warmOut = adbOrDie(startCmd, route.id)
+    const warmTotalTimeMs = parseTotalTimeMs(warmOut)
+    if (warmTotalTimeMs === null) {
+      console.log(
+        `${GATE}: NOTE — route '${route.id}': the warm start printed no TotalTime (delivered to the existing activity); warmTotalTimeMs omitted`,
+      )
+    }
+
+    screens[route.id] = {
+      totalTimeMs,
+      coldSamplesMs,
+      ...(warmTotalTimeMs === null ? {} : { warmTotalTimeMs }),
+      ...(fullyDrawnMs === null ? {} : { fullyDrawnMs }),
+    }
     console.log(
-      `${GATE}: ${route.id.padEnd(16)} TotalTime ${String(totalTimeMs).padStart(6)}ms${fullyDrawnMs === null ? '' : `  fully-drawn ${String(fullyDrawnMs)}ms`}`,
+      `${GATE}: ${route.id.padEnd(16)} cold median ${String(totalTimeMs).padStart(6)}ms (${coldSamplesMs.map(String).join('/')}ms)${warmTotalTimeMs === null ? '' : `  warm ${String(warmTotalTimeMs)}ms`}${fullyDrawnMs === null ? '' : `  fully-drawn ${String(fullyDrawnMs)}ms`}`,
     )
   }
 
@@ -127,6 +168,6 @@ if (invokedDirectly) {
   writeFileSync(RESULTS, `${JSON.stringify({ screens }, null, 2)}\n`)
   ok(
     GATE,
-    `${String(routes.length)} route(s) cold-started; wrote ${RESULTS} (enforce with: HARNESS_PERF_LANE=1 node tools/check-mobile-perf.mjs)`,
+    `${String(routes.length)} route(s) cold-started ×${String(COLD_RUNS)} (median) + 1 warm start each; wrote ${RESULTS} (enforce with: HARNESS_PERF_LANE=1 node tools/check-mobile-perf.mjs)`,
   )
 }

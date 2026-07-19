@@ -54,15 +54,26 @@ test('parseFullyDrawnMs handles +XsYms, bare +Yms, and absence', () => {
 // End-to-end against the stub adb.
 // ---------------------------------------------------------------------------
 
-const IMPL = `import { readFileSync } from 'node:fs'
+const IMPL = `import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-const spec = JSON.parse(
-  readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'behavior.json'), 'utf8'),
-)
+const here = dirname(fileURLToPath(import.meta.url))
+const spec = JSON.parse(readFileSync(join(here, 'behavior.json'), 'utf8'))
 const args = process.argv.slice(2).join(' ')
 if (args === 'get-state') { console.log(spec.device === false ? 'unknown' : 'device'); process.exit(spec.device === false ? 1 : 0) }
-if (args.startsWith('shell am start')) { console.log(spec.amOutput); process.exit(0) }
+if (args.startsWith('shell am start')) {
+  let out = spec.amOutput
+  if (Array.isArray(spec.amOutputs)) {
+    // Sequenced outputs across invocations (fresh process each time — a counter
+    // file carries the position), so median arithmetic is testable.
+    const counter = join(here, 'am-count.txt')
+    let n = 0
+    try { n = Number(readFileSync(counter, 'utf8')) } catch { n = 0 }
+    out = spec.amOutputs[Math.min(n, spec.amOutputs.length - 1)]
+    writeFileSync(counter, String(n + 1))
+  }
+  console.log(out); process.exit(0)
+}
 if (args === 'logcat -d') { console.log(spec.logcat ?? ''); process.exit(0) }
 process.exit(0)
 `
@@ -106,7 +117,7 @@ function run(dir, { ci = false } = {}) {
   return { code: res.status, out: `${res.stdout ?? ''}${res.stderr ?? ''}` }
 }
 
-test('GREEN: cold-starts every route and writes the perf-results contract', () => {
+test('GREEN: 3 cold starts (median) + 1 warm start per route, writes the perf-results contract', () => {
   const dir = fixture({
     amOutput: AM_OUTPUT,
     logcat: 'I ActivityTaskManager: Fully drawn com.example.stub/.MainActivity: +1s54ms',
@@ -116,19 +127,76 @@ test('GREEN: cold-starts every route and writes the perf-results contract', () =
   const results = JSON.parse(readFileSync(join(dir, 'artifacts/perf-results.json'), 'utf8'))
   assert.deepEqual(results, {
     screens: {
-      home: { totalTimeMs: 843, fullyDrawnMs: 1054 },
-      matrix: { totalTimeMs: 843, fullyDrawnMs: 1054 },
+      home: {
+        totalTimeMs: 843,
+        coldSamplesMs: [843, 843, 843],
+        warmTotalTimeMs: 843,
+        fullyDrawnMs: 1054,
+      },
+      matrix: {
+        totalTimeMs: 843,
+        coldSamplesMs: [843, 843, 843],
+        warmTotalTimeMs: 843,
+        fullyDrawnMs: 1054,
+      },
     },
   })
-  assert.ok(r.out.includes('2 route(s) cold-started'), r.out)
+  assert.ok(r.out.includes('2 route(s) cold-started ×3 (median) + 1 warm start each'), r.out)
 })
 
-test('GREEN: a missing Fully-drawn line records totalTimeMs only (honest absence)', () => {
-  const dir = fixture({ amOutput: AM_OUTPUT, logcat: '' })
+const amOut = (ms) =>
+  `Status: ok\nLaunchState: COLD\nTotalTime: ${ms}\nWaitTime: ${ms + 8}\nComplete\n`
+
+test('median arithmetic: totalTimeMs is the middle cold roll, every roll recorded in order', () => {
+  // 2 routes × (3 cold + 1 warm) = 8 sequenced outputs.
+  const dir = fixture({
+    amOutputs: [
+      amOut(900),
+      amOut(400),
+      amOut(500),
+      amOut(100), // home: cold median 500, warm 100
+      amOut(700),
+      amOut(300),
+      amOut(600),
+      amOut(50), // matrix: cold median 600, warm 50
+    ],
+    logcat: '',
+  })
   const r = run(dir)
   assert.equal(r.code, 0, r.out)
   const results = JSON.parse(readFileSync(join(dir, 'artifacts/perf-results.json'), 'utf8'))
-  assert.deepEqual(results.screens.home, { totalTimeMs: 843 })
+  assert.deepEqual(results.screens.home, {
+    totalTimeMs: 500,
+    coldSamplesMs: [900, 400, 500],
+    warmTotalTimeMs: 100,
+  })
+  assert.deepEqual(results.screens.matrix, {
+    totalTimeMs: 600,
+    coldSamplesMs: [700, 300, 600],
+    warmTotalTimeMs: 50,
+  })
+})
+
+test('GREEN: a warm start with no TotalTime records honest absence with a NOTE; fullyDrawn absence too', () => {
+  const warmless = 'Warning: Activity not started, intent delivered to the running activity\n'
+  const dir = fixture({
+    amOutputs: [
+      amOut(843),
+      amOut(843),
+      amOut(843),
+      warmless,
+      amOut(843),
+      amOut(843),
+      amOut(843),
+      warmless,
+    ],
+    logcat: '',
+  })
+  const r = run(dir)
+  assert.equal(r.code, 0, r.out)
+  assert.ok(r.out.includes('the warm start printed no TotalTime'), r.out)
+  const results = JSON.parse(readFileSync(join(dir, 'artifacts/perf-results.json'), 'utf8'))
+  assert.deepEqual(results.screens.home, { totalTimeMs: 843, coldSamplesMs: [843, 843, 843] })
 })
 
 test('RED: am output without TotalTime reds naming the route — unmeasured must not pass', () => {
