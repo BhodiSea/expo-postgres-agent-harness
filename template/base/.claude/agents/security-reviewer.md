@@ -40,9 +40,14 @@ evidence, never as a pass. Two sections:
   (no reason leak); `.dev-auth/` material never committed or read.
 - `MIGRATOR_DATABASE_URL` (the RLS-bypassing owner role — this stack's
   service-key analog) appears ONLY in drizzle-kit invocations, `pnpm db:migrate`,
-  and `tests/migrations/` — nowhere in app code.
+  and the harness RLS runners (`tests/migrations/`, `tests/rls/` — plan-probe
+  seeding + ANALYZE) — nowhere in app code.
 - Middleware: every `/api/*` route sits behind the version-skew AND auth middleware;
-  `/healthz` (and the openapi document route) are the only unauthenticated surfaces;
+  `/healthz` (and the openapi document route) are the only always-unauthenticated
+  surfaces, plus the mode-gated `POST /auth/dev-token` (registered only under
+  `AUTH_MODE=stub` — it mints the very credential the guards demand; 404 under
+  entra; production exposure boot-fatal via `assertAuthBootSafety` in
+  `src/auth/verify.ts`). Any OTHER new unauthenticated surface is a FAIL;
   `apps/server/openapi.json` regenerated if routes changed.
 - Client purity: nothing in `apps/mobile/` imports server/db modules
   (`postgres`, `drizzle-orm`, `@hono/*`, `pino`); every API call goes through

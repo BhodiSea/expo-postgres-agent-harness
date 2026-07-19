@@ -51,6 +51,12 @@ jobs:
           node-version: 22
       - run: node scripts/check-syntax.mjs
       - run: node scripts/hygiene.mjs
+      # Plugin manifests + the shipped agent roster, validated at their SOURCE:
+      # plugin.json/marketplace.json reference only files that exist (dangling
+      # paths are dead on install), and every reviewer agent stays read-only by
+      # construction (tools ⊆ allowlist, disallowedTools ⊇ Write/Edit) — a PR
+      # that widens a reviewer reds here before any scaffold runs docs-sync.
+      - run: node scripts/check-plugin-manifest.mjs
       # Gate↔canary lockstep (mirrors the source harness's placement): every
       # VALIDATE ∪ STOP step carries a registered red-proof, every proof file
       # runs green with real tests (the zero-test TAP detection is

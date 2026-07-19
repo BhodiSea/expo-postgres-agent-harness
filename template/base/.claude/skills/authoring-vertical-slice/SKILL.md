@@ -31,7 +31,9 @@ non-trivial layers to the named subagent.
    `pnpm openapi:emit` (the `contracts` gate diffs `apps/server/openapi.json`).
 4. **Mobile screen** — read `references/mobile-screen.md`. Feature dir at
    `apps/mobile/src/features/<feature>/` + the `app/` route file; REGISTER the
-   screen in `src/routes.ts` (id, titleKey, path, file, state testIDs); typed data
+   screen in `src/routes.ts` (id, titleKey, path, file, state testIDs) and render
+   its root as `<Screen testID="<route-id>-screen">` (the Maestro device lane
+   asserts that container id for every ROUTES entry); typed data
    access ONLY through `src/lib/api-client.ts`; tokens-only styling through
    `src/theme`; every string a catalog key; no `expo-secure-store` outside
    `src/host/**`; degrade gracefully when the API is unreachable.

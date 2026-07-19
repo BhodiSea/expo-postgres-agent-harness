@@ -30,8 +30,10 @@ SOURCE: docs/harness/README.md (security-invariants rule)
   every statement), in the same migration that creates it. Exemptions live only
   in the human-reviewed `tools/rls-exempt.json`.
 - **Mobile-bundle purity.** `apps/mobile` never imports `postgres`,
-  `drizzle-orm`, `pg`, `@hono/*`, `pino`, or anything in `apps/server`; it talks
-  to the API via typed contracts from `@app/contracts`.
+  `drizzle-orm`, `pg`, `@hono/*`, `pino`, `@app/schema`, or anything in
+  `apps/server`; it talks to the API via typed contracts from `@app/contracts` —
+  resolving `@app/schema` from the mobile tree drags the ORM into the shipped
+  bundle.
 - **The api-client is the one door to the API.** Every request goes through
   `src/lib/api-client.ts` (`apiFetch`/`apiPost` — origin, bearer token, and
   error-envelope decoding live there and nowhere else). Never call `fetch()`
@@ -50,6 +52,17 @@ SOURCE: docs/harness/README.md (security-invariants rule)
 - **Identity is locked.** `ios.bundleIdentifier` / `android.package` (and the
   slug + URL scheme) match `tools/identity.lock.json` — store identity is upgrade
   identity and never changes.
+- **Transport is pinned.** No `NSAllowsArbitraryLoads`; ATS exception domains
+  are loopback-only (`localhost` / `127.0.0.1`); `usesCleartextTraffic` is
+  banned everywhere in the resolved config (including an `expo-build-properties`
+  plugin entry); `extra.apiOrigin` is https-or-loopback. The `expo-policy` gate
+  (`tools/check-expo-policy.mjs`) asserts all four over the RESOLVED config, so
+  a plugin cannot smuggle a cleartext opt-in past a clean `app.config.ts`.
+- **OTA update trust.** `runtimeVersion` stays exactly
+  `{ "policy": "appVersion" }` — the deterministic, PR-reviewable OTA
+  compatibility boundary — and `updates.url` (when present) embeds the locked
+  EAS projectId: an update URL pointing at another project is a hijacked OTA
+  channel.
 - **Never put a secret behind an `EXPO_PUBLIC_` name** (`EXPO_PUBLIC_*KEY|SECRET|
   TOKEN|PASSWORD|PRIVATE`) — EXPO_PUBLIC_ vars are inlined into the shipped
   client bundle.

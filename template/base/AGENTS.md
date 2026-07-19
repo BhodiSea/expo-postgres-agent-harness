@@ -10,8 +10,9 @@ SOURCE: docs/harness/README.md.
   Architecture, React Compiler on) with expo-router file routes under `app/`.
   CNG: `android/` and `ios/` are prebuild OUTPUT — generated, never committed,
   never hand-edited; native change = config plugin from the reviewed allowlist
-  (`tools/expo-plugins.json`). The keychain (expo-secure-store) is touched ONLY
-  by `src/host/**` + `src/auth/**`; the API only through `src/lib/api-client.ts`.
+  (`tools/expo-plugins.json`). The keychain (expo-secure-store) has ONE door:
+  `src/host/**` — auth providers own the credential lifecycle but store through
+  the host seam's `secure*` helpers; the API only via `src/lib/api-client.ts`.
 - **apps/server** — Hono + Node 22 API on `PORT` (default 8787). Auth =
   `AUTH_MODE=stub|entra`, one jose `jwtVerify` path (pinned iss/aud/alg,
   `clockTolerance: 300`). Boot-time fatal: `NODE_ENV=production` + stub.
@@ -158,9 +159,17 @@ versions = `catalog:` (the catalog is the only place version numbers appear).
   Input/Field/Screen/Toast/EmptyState/OptionRow) — raw text outside AppText is
   lint-red; new control styling goes into the primitive.
 - **Put testID on the interactive/accessible LEAF element** — Fabric view
-  flattening can detach a testID riding an unstyled wrapper View (New
-  Architecture; design record: CI-LANE-FACTS). A styled or accessible element
-  survives; a bare layout View may not.
+  flattening can detach a testID riding an unstyled wrapper View: the New
+  Architecture optimizes layout-only Views out of the native tree
+  (https://reactnative.dev/architecture/view-flattening). A styled or
+  accessible element survives; a bare layout View may not.
+- **Every effect that registers tears down in the cleanup it RETURNS** — the
+  perf-budget gate's leak scan pairs `.addEventListener`→`.removeEventListener`/
+  `.remove()`, `.addListener`→`.remove()`, `setInterval`→`clearInterval`,
+  `requestAnimationFrame`→`cancelAnimationFrame`, `.subscribe(`→`.unsubscribe()`,
+  `runAfterInteractions`→`.cancel()`. Mobile apps live for days between cold
+  starts — a leaked AppState/Keyboard listener compounds. Escape = reviewed
+  `tools/perf-budget.json` `effectCleanupAllow[]` entry.
 - **Write UX follows `features/notes`**: optimistic insert with a temp id,
   reconcile-or-rollback in ONE reducer (`useCreateNote.ts`), zod errors inline
   at the contract boundary, failures as envelope-code toasts translated via
@@ -182,6 +191,13 @@ versions = `catalog:` (the catalog is the only place version numbers appear).
   (fixed row height shared with `getItemLayout`, tuned window), keyset
   pagination via `useKeysetQuery`, one accessible element per row, an explicit
   Load-more control alongside the scroll trigger.
+- **Commands follow `features/actions`** (the `app/actions.tsx` modal): typed
+  registry (`registry.ts` — the `ActionGroup` union makes an unsectioned
+  command a compile error; titles are catalog keys, ranked over the RESOLVED
+  text), deterministic pure scorer (`fuzzyScore.ts` — total order: score desc,
+  title asc, id asc; no Date, no randomness), recents persisted through the kv
+  seam (`recents.ts` — corrupt payloads read as empty, capped, stale ids
+  filtered at render). New commands extend the registry, never the modal.
 
 ## Provenance
 
@@ -190,7 +206,8 @@ versions = `catalog:` (the catalog is the only place version numbers appear).
   `// SOURCE: <authority> [corpus: <id>]` (`-- SOURCE:` in SQL). Corpus ids
   resolve against `tools/mcp/corpus/index.json` (use the `corpus_search` MCP
   tool mid-turn; extend the corpus in the PR that cites it). Cite an entry whose
-  `groups` cover the decision's class; a bare URL counts only on a
+  `groups` cover the decision's class (cross-group escapes = human-reviewed
+  `tools/provenance-overrides.json`); a bare URL counts only on a
   `tools/lib/citation-domains.mjs` allowlisted host.
 - Emit one ADR per slice via `/adr <slice>` (records in `docs/adr/`); then run
   `/verify-citations` until it returns `CITATIONS: CLEAN`.
@@ -205,6 +222,9 @@ versions = `catalog:` (the catalog is the only place version numbers appear).
   (`docs/runbooks/expand-contract.md`) — mobile clients skew by MORE than a
   version: store review lags, rollouts are staged, and some installs never
   update. Server first, contract phase last.
+- `/new-feature <name>` drives the one-turn slice recipe (the
+  `authoring-vertical-slice` skill): migration + RLS → DAL → route + contract
+  regen → mobile screen → tests → provenance → green gate.
 - Reviewers are read-only subagents (the `docs-sync` gate asserts their
   frontmatter stays read-only): `security-reviewer` (MUST run on RLS/DAL/auth
   changes), `mobile-security-reviewer` (MUST run on keychain/api-client/

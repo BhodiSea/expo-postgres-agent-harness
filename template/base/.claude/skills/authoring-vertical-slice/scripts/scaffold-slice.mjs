@@ -62,7 +62,9 @@ const files = [
       '// data access ONLY via src/lib/api-client.ts (apiFetch/apiPost); strings are\n' +
       '// catalog keys rendered with t(); styling through useThemedStyles + the token\n' +
       '// scales. Register the screen in src/routes.ts (id, titleKey, path, file,\n' +
-      '// state testIDs) and give it an app/ route file. See references/mobile-screen.md.\n' +
+      '// state testIDs) and give it an app/ route file whose root renders\n' +
+      '// <Screen testID="<route-id>-screen"> (the device lane asserts that container\n' +
+      '// id for every ROUTES entry). See references/mobile-screen.md.\n' +
       `export function ${pascal}View() {\n  return null\n}\n`,
   ],
   [
@@ -99,5 +101,11 @@ console.log('next: add an IsolationTarget to tests/rls/db-context.ts for each us
 console.log('next: register new DAL query shapes in tests/rls/dal-shapes.ts (plan probe closure)')
 console.log('next: register the routes in apps/server/src/app.ts, then run: pnpm openapi:emit')
 console.log(
-  `next: register the screen in apps/mobile/src/routes.ts + add its app/ route file, Maestro flow, and tools/startup-budget.json row`,
+  'next: register the screen in apps/mobile/src/routes.ts + add its app/ route file ' +
+    'rendering <Screen testID="<route-id>-screen"> (the device lane asserts that id)',
 )
+console.log(
+  'next: scaffold the Maestro flow (after registering): ' +
+    `node tools/gen-maestro-flows.mjs --flow ${feature}`,
+)
+console.log('next: add the tools/startup-budget.json row (human-reviewed budget)')

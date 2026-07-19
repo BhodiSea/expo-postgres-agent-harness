@@ -85,11 +85,12 @@ module.exports = {
     {
       name: 'secure-store-host-seam-only',
       comment:
-        'expo-secure-store is the credential seam: only src/host/** and src/auth/** may touch ' +
-        'it. A feature reading the keychain directly bypasses the AccessTokenProvider ' +
-        'discipline (single door, corrupt-safe, mockable).',
+        'expo-secure-store is the credential seam: only src/host/** may touch it. The auth ' +
+        'providers own the credential lifecycle but store through AccessTokenProvider — a ' +
+        'module reading the keychain directly bypasses that discipline (single door, ' +
+        'corrupt-safe, mockable).',
       severity: 'error',
-      from: { path: '^apps/mobile', pathNot: '^apps/mobile/src/(host|auth)/' },
+      from: { path: '^apps/mobile', pathNot: '^apps/mobile/src/host/' },
       to: { path: 'node_modules/expo-secure-store/' },
     },
     {

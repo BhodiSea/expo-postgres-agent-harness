@@ -83,6 +83,11 @@ bare `console` outside `src/lib/log.ts`.
 feature → FAIL no-restricted-imports; call `fetch()` in a screen → FAIL
 no-restricted-globals (depcruise walls the same seams at the module-graph level —
 defense in depth).
+**Papercut:** `--cache` keys on file content + eslint config, NOT on tsconfig —
+after a tsconfig change fixes a typed-lint error, the stale `.eslintcache` can
+keep reporting it (observed live: a `jest.setup.ts` include fix stayed red until
+the cache was dropped). If lint contradicts a fix you just made, `rm
+.eslintcache` and re-run before debugging further.
 
 ### 5. provenance — `node tools/check-sources.mjs`
 

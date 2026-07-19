@@ -28,10 +28,11 @@ unsourced — that is an automatic problem (the `provenance` gate will fail it t
 Pass 2 — EXISTENCE-RESOLVE: resolve every cited source by its kind.
 
 - **Corpus reference** (`[corpus: <id>]`, e.g. `postgres/rls-initplan`,
-  `entra/jwt-verify`, `harness/doctrine`): call `corpus_resolve` (or
-  `corpus_search`) and confirm the id is pinned in `tools/mcp/corpus/index.json`.
-  An id the corpus does not know is UNRESOLVABLE — new corpus entries must be
-  added deliberately in the same PR that first cites them.
+  `expo/app-config`, `entra/jwt-verify`, `harness/doctrine`): call
+  `corpus_resolve` (or `corpus_search`) and confirm the id is pinned in
+  `tools/mcp/corpus/index.json`. An id the corpus does not know is UNRESOLVABLE
+  — new corpus entries must be added deliberately in the same PR that first
+  cites them.
 - **Internal source** (a repo-relative path such as `docs/harness/README.md §2` or a
   `docs/adr/<id>.md`): do NOT WebFetch it. `Read` the file and confirm the cited
   `§`/anchor heading exists. Mark UNRESOLVABLE only if neither the corpus nor the
@@ -43,7 +44,7 @@ Pass 2 — EXISTENCE-RESOLVE: resolve every cited source by its kind.
   entry or is a subdomain of it). Mark UNRESOLVABLE if the URL 404s, the anchor
   is missing, or the page does not load; if WebFetch is not permitted for an
   allowlisted domain, fall back to `corpus_search` before marking. A cited domain
-  NOT on that list (e.g. `github.com`, `learn.microsoft.com`) is still
+  NOT on that list (e.g. `github.com`, the `expo.dev` apex) is still
   RESOLVED-VIA-CORPUS — not UNRESOLVABLE — if `corpus_search` returns a pinned
   entry for it; otherwise UNRESOLVABLE (and the `provenance` gate will fail the
   bare URL too: pin it in the corpus in the same PR).
@@ -51,7 +52,8 @@ Pass 2 — EXISTENCE-RESOLVE: resolve every cited source by its kind.
 Pass 3 — SUPPORT-CHECK: read the resolved source (corpus `text` for pinned entries)
 and confirm it actually backs the SPECIFIC claim, not merely the general topic. Mark
 UNSUPPORTED if the source is real but does not back the decision (e.g. citing
-`postgres/rls-initplan` for a keyset-pagination index choice).
+`postgres/rls-initplan` for a keyset-pagination index choice, or `apple/ats` for
+an Android `usesCleartextTraffic` exception — that surface is `android/cleartext`).
 
 Output a table of `{ site, source, EXISTS?, SUPPORTS? }` and a final single line:
 `CITATIONS: CLEAN`, or `CITATIONS: REJECTED` listing every hallucinated /

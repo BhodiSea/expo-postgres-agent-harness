@@ -24,6 +24,10 @@ components. Check:
   raw `Pressable`/`TouchableOpacity`/`TextInput` composed outside the primitives:
   it dodges the primitives' a11y test (`__tests__/primitives-a11y.test.tsx`).
   SOURCE: https://reactnative.dev/docs/accessibility
+- **Non-text content (1.1.1)**: informative images carry an accessible name (`alt`
+  or `accessibilityLabel`); decorative images are hidden from assistive technology
+  (`accessible={false}`) so they never announce as an unlabeled image. The scaffold
+  ships no in-app `Image` yet — audit any diff that adds one.
 - **Touch target size (2.5.8)**: at least 44×44 pt (the platform HIG floor —
   WCAG's 24 px is an absolute minimum, not a target) or adequate spacing; check
   `hitSlop` on small controls.
@@ -43,18 +47,21 @@ components. Check:
   container with a composed label), not as a word salad of child fragments —
   and interactive children must NOT be swallowed by an accessible parent.
 - **Reduced motion**: animations respect the OS reduce-motion setting
-  (`AccessibilityInfo.isReduceMotionEnabled` / the theme's motion guard) — a held
-  loading state must not pulse under reduced motion.
+  (`AccessibilityInfo.isReduceMotionEnabled`) — a held loading state must not pulse
+  under reduced motion.
 - **Colour contrast AA**: check the RESOLVED token values from
   `src/theme/tokens.gen.ts` in BOTH palettes, not the token names; body text holds
   AA (the styleguide manifest computes the committed pairs — flag any literal
   color that bypasses the tokens).
-- **RTL**: layout uses logical properties (start/end margins, `writingDirection`
-  via the i18n seam) — the pseudo-RTL sweep catches regressions, but flag hardcoded
-  left/right that will fail it.
+- **RTL**: layout uses logical properties (start/end margins); layout direction
+  comes from the i18n seam's `I18nManager` wiring (`src/i18n/platform.ts`) — the
+  pseudo-RTL sweep catches regressions, but flag hardcoded left/right that will
+  fail it.
 
 Report each violation by WCAG success criterion with a `file:line` reference. You
 CANNOT run tests — the primitives a11y suite and the per-route states sweep run
 inside `pnpm test:mobile` (jest-expo); recommend the main thread run them as
-evidence (the deep on-device sweep is the Maestro CI lane). Flag only genuine
-conformance gaps. End with a single line: `PASS` or `FAIL`.
+evidence (the deep sweep is the opt-in `gate-a11y-deep` module: a jest-expo
+manifest-keyed sweep plus the manual TalkBack/VoiceOver runbook — there is
+deliberately no device-side ATF lane). Flag only genuine conformance gaps. End
+with a single line: `PASS` or `FAIL`.

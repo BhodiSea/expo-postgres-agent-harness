@@ -172,7 +172,12 @@ jobs:
 
       - name: Mutate them (StrykerJS)
         if: steps.scope.outputs.files != ''
-        run: pnpm exec stryker run stryker.config.mjs --mutate "${{ steps.scope.outputs.files }}"
+        # env indirection, not ${{ }} inside run: file NAMES ride this value, and
+        # a branch can name a file almost anything — expanding it into the shell
+        # text would make that name executable (zizmor: template-injection).
+        env:
+          MUTATE_FILES: ${{ steps.scope.outputs.files }}
+        run: pnpm exec stryker run stryker.config.mjs --mutate "$MUTATE_FILES"
 
       # The gate. A survivor the baseline does not accept reds the PR.
       - name: Mutation ratchet (survivors vs the committed baseline)

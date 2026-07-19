@@ -52,7 +52,9 @@ Non-negotiable:
    imported from `@app/contracts`; new endpoints mount under `/api/*` so the
    version-skew, auth, and bodyLimit middleware cover them (a unit test walks the
    route table to prove it); `userId` comes from `c.get('userId')` (set by
-   `requireAuth`). `/healthz` stays the only unauthenticated route. Auth failures
+   `requireAuth`). `/healthz` and `/openapi.json` stay the only always-unauthenticated
+   routes (stub mode also registers `POST /auth/dev-token` — never under entra, and
+   production + stub is boot-fatal via `assertAuthBootSafety`). Auth failures
    collapse to a bare 401 envelope — never leak why a credential was rejected.
 8. After ANY route change the committed contract must be regenerated:
    `pnpm openapi:emit` (the `contracts` gate re-emits and fails on diff). List this
@@ -68,5 +70,6 @@ Non-negotiable:
    reliance, timeouts, retries, verification constants) — the provenance gate flags
    unsourced decision keywords.
 
-Read `references/dal-dto.md` first. Return only the final file list + the commands to
-run (`pnpm openapi:emit`, `pnpm validate`, `pnpm test`).
+Read `.claude/skills/authoring-vertical-slice/references/dal-dto.md` first. Return only
+the final file list + the commands to run (`pnpm openapi:emit`, `pnpm validate`,
+`pnpm test`).

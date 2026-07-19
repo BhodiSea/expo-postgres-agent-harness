@@ -121,13 +121,16 @@ export default tseslint.config(
     },
   },
   {
-    // The platform keychain has ONE door: src/host/** (the SecureStore seam) and
-    // src/auth/** (the providers that own the credential lifecycle). A feature
-    // importing expo-secure-store directly bypasses the corrupt-safe, mockable
-    // AccessTokenProvider discipline. depcruise enforces the same wall on the
-    // resolved module graph — lint catches it at the write, architecture at validate.
+    // The platform keychain has ONE door: src/host/** (the SecureStore seam).
+    // The auth providers own the credential LIFECYCLE but store through the
+    // host seam's AccessTokenProvider — they never import expo-secure-store
+    // themselves (a W8 audit found this exemption listed src/auth/** too while
+    // every doctrine surface and the write-guard hook said host-only; the code
+    // agreed with the doctrine, so the exemption tightened to match). depcruise
+    // enforces the same wall on the resolved module graph — lint catches it at
+    // the write, architecture at validate.
     files: ['apps/mobile/**/*.ts', 'apps/mobile/**/*.tsx'],
-    ignores: ['apps/mobile/src/host/**', 'apps/mobile/src/auth/**'],
+    ignores: ['apps/mobile/src/host/**'],
     rules: {
       'no-restricted-imports': [
         'error',

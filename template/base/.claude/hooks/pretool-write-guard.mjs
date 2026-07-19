@@ -110,7 +110,9 @@ if (
 // hooks, and CI workflows require an explicit human-in-the-loop escape hatch. Layer 1 is the
 // settings.json deny list. NOTE: app.config.ts / eas.json are deliberately NOT
 // blanket-protected — adding a plugin or a permission is routine vertical-slice work;
-// specific weakenings are content-checked below instead.
+// specific app.config.* / app.json weakenings are content-checked below; eas.json's
+// weakening surface (secret-shaped build-profile env names) is asserted by the
+// expo-policy gate instead.
 // SOURCE: docs/harness/README.md (tamper evidence)
 if (
   process.env.HARNESS_ALLOW_SELF_EDIT !== '1' &&
@@ -148,7 +150,7 @@ const anyRel = (re) => rels.some((r) => re.test(r))
 // lands product bytes, so one exempt-looking name must not buy an exemption.
 const isExempt = (/** @type {string} */ r) =>
   /^\.claude\//.test(r) ||
-  /^(tests?|e2e)\//.test(r) ||
+  /^tests?\//.test(r) ||
   /^apps\/mobile\/__tests__\//.test(r) ||
   /\.(test|spec)\.[a-z]+$/.test(r)
 if (rels.every(isExempt)) {

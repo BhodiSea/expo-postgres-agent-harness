@@ -14,15 +14,22 @@
   are `testID`s your UI must render for each canonical data state (read path:
   `NotesPanel.tsx` + `useListQuery.ts`; write path: `NoteComposer.tsx` +
   `useCreateNote.ts` — optimistic insert with a temp id, reconcile-or-rollback in
-  one plain reducer, envelope-message toasts). An `app/` screen no entry
-  references (and that is not allowlisted chrome in `tools/route-allowlist.json` —
-  human decision) fails the `route-manifest` gate; the test lanes ITERATE the
-  array (the RNTL states sweep per state, the Maestro device lane per flow, the
-  startup-budget closure per screen), so registering the screen is what buys it
-  coverage. Every screen needs real loading/empty/error surfaces — the error
-  state must contain its retry affordance.
+  one plain reducer, envelope-message toasts). The screen's root is the styled
+  `Screen` primitive with `testID="<route-id>-screen"` (see `app/sign-in.tsx`) —
+  the device lane asserts exactly that container id for every `ROUTES` entry
+  (`tools/lib/maestro-flows.mjs`), so a screen without it reds its first sweep.
+  An `app/` screen no entry references (and that is not allowlisted chrome in
+  `tools/route-allowlist.json` — human decision) fails the `route-manifest`
+  gate; the test lanes ITERATE the array (the RNTL states sweep per state, the
+  Maestro device lane per flow, the startup-budget closure per screen), so
+  registering the screen is what buys it coverage. Every screen needs real
+  loading/empty/error surfaces — the error state must contain its retry
+  affordance.
 - **Closure duties for a NEW screen** (the `mobile-perf --closure` Stop step reds
-  otherwise): a Maestro flow for the screen and a row in
+  otherwise): a Maestro flow for the screen — scaffold it with
+  `node tools/gen-maestro-flows.mjs --flow <route-id>` (writes
+  `maestro/flows/<route-id>.yaml` with the correct appId + container assert;
+  refuses to overwrite a hand-tuned flow) — and a row in
   `tools/startup-budget.json` (human-reviewed budget — propose the row in your
   report if you cannot write it).
 - **Styling is tokens-only** (the `styleguide` gate enforces it):
@@ -46,7 +53,7 @@
   network failure as first-class states.
 - React Compiler is on (`experiments.reactCompiler`): follow the Rules of React —
   pure components/hooks, no conditional hooks; the eslint react-hooks + compiler
-  rules fail the gate on violations.
+  rules fail the gate on violations. `[corpus: react/compiler]`
 
 ## Boundaries (hook-, lint-, depcruise-, and bundle-gate-enforced)
 
@@ -68,8 +75,10 @@
 
 `addEventListener` → remove, `setInterval` → clear, a subscription →
 `.remove()`/`.unsubscribe()` — in the cleanup the effect RETURNS. A leaked
-listener costs nothing on first mount, which is why only the emitter-count spec
-(jest-expo, mount/unmount loop) can see it; write the teardown with the effect.
+listener costs nothing on first mount, so no render benchmark sees it; the only
+shipped enforcement is the static leak scan in `tools/check-perf-budget.mjs`
+(each registration paired with a teardown inside the returned cleanup), and it
+proves pairing, not behaviour — write the teardown with the effect.
 
 ## Connection-aware UI
 
@@ -94,5 +103,7 @@ Semantics come only from props — there is no DOM:
 - Touch targets ≥ 44×44 pt; never `allowFontScaling={false}`; layouts survive
   200% font scale; animations respect reduced motion.
 - Fabric view flattening can detach `testID`s on nested plain Views — put
-  `testID` on interactive/accessible LEAF elements, never a deep testID inside
-  an unstyled wrapper.
+  `testID` on interactive/accessible LEAF elements or on a STYLED container
+  (the `Screen` primitive's `<route-id>-screen` id survives because the
+  container is styled — the selector doctrine in `tools/lib/maestro-flows.mjs`),
+  never a deep testID inside an unstyled wrapper.

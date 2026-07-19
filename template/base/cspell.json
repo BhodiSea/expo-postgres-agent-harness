@@ -2,7 +2,7 @@
   "version": "0.2",
   "language": "en,en-GB",
   "useGitignore": true,
-  "ignoreRegExpList": ["/[^\\x00-\\x7F]+/g"],
+  "ignoreRegExpList": ["/[^\\x00-\\x7F]+/g", "{{APP_IDENTIFIER}}"],
   "words": [
     "{{APP_SCHEME}}",
     "acmeapp",
