@@ -14,6 +14,10 @@ import { sizes } from '../theme/tokens.gen'
 // the caller's layout (design record: CI-LANE-FACTS, leaf-testID discipline).
 // SOURCE: Apple HIG — give controls a hit target of at least 44×44 pt
 // https://developer.apple.com/design/human-interface-guidelines/accessibility#Buttons-and-controls
+// Aliased once: two adjacent generic-typed props would end/open lines with
+// >/<, which the i18n scanner's JSX-text heuristic mis-reads as copy.
+type PressableStyle = StyleProp<ViewStyle>
+
 interface PressableScaleProps {
   readonly onPress: () => void
   readonly children: ReactNode
@@ -25,9 +29,9 @@ interface PressableScaleProps {
   readonly accessibilityHint?: string | undefined
   readonly testID?: string | undefined
   /** Layout of the scaled wrapper (alignSelf etc.) — the transform rides it. */
-  readonly containerStyle?: StyleProp<ViewStyle>
+  readonly containerStyle?: PressableStyle
   /** The control's own look (border/background/padding) — tokens-only, from the caller's factory. */
-  readonly style?: StyleProp<ViewStyle>
+  readonly style?: PressableStyle
 }
 
 // Theme-independent: the hit-target floor and the two state dips carry no
