@@ -36,7 +36,9 @@ non-trivial layers to the named subagent.
    asserts that container id for every ROUTES entry); typed data
    access ONLY through `src/lib/api-client.ts`; tokens-only styling through
    `src/theme`; every string a catalog key; no `expo-secure-store` outside
-   `src/host/**`; degrade gracefully when the API is unreachable.
+   `src/host/**`; degrade gracefully when the API is unreachable. BEFORE
+   composing the screen, read the `designing-mobile-ui` skill's checklist for
+   the surface type — state choreography and motion follow its references.
 5. **Tests** — read `references/tests.md`. Add the `IsolationTarget` in
    `tests/rls/db-context.ts` (and DAL shapes in `tests/rls/dal-shapes.ts`), unit
    tests in the right runner (vitest for server/packages/pure logic; jest-expo for
@@ -50,6 +52,7 @@ non-trivial layers to the named subagent.
    you may not advance to step 7 — until BOTH the ADR file exists AND citations are
    CLEAN.
 7. **Gate** — finish only when the step-6 ADR exists, `/verify-citations` is CLEAN,
+   the `design-reviewer` answers `PASS` on any UI the slice touched,
    and `pnpm validate`, `pnpm test:rls`, `pnpm test`, and `pnpm test:mobile` are
    green. The Stop hook runs the same steps directly (`node tools/validate.mjs`,
    `node tests/rls/run-rls.mjs`, vitest + jest); do not stop on a red build or with

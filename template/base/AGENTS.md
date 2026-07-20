@@ -117,6 +117,11 @@ versions = `catalog:` (the catalog is the only place version numbers appear).
   `ios.buildNumber`, `android.versionCode` are DERIVED from package.json in
   `app.config.ts`; `eas.json` keeps `appVersionSource: "local"`,
   `autoIncrement: false`; `runtimeVersion.policy` stays `appVersion`.
+- **Store readiness is gate data** (`tools/store-policy.json`, reviewed):
+  export compliance stays DECLARED (`ITSAppUsesNonExemptEncryption`), every
+  iOS usage string is reviewed in `tools/expo-permissions.json` `ios[]`, the
+  targetSdk floor holds, and an auth surface requires the account-deletion
+  surface (`session.deleteAccount` + `DELETE /api/me` — Apple 5.1.1(v)).
 - **`WITH RECURSIVE` requires a `CYCLE` clause or visited guard** — graph data
   loops forever otherwise.
 - **Prompt lock discipline:** every LLM prompt file is versioned in its name
@@ -199,6 +204,18 @@ versions = `catalog:` (the catalog is the only place version numbers appear).
   seam (`recents.ts` — corrupt payloads read as empty, capped, stale ids
   filtered at render). New commands extend the registry, never the modal.
 
+- **Design bar (the `designing-mobile-ui` skill is the full doctrine; the
+  `design-reviewer` holds diffs to it).** Motion uses motion tokens only,
+  through the seam (`src/lib/motion.ts`), animates transform/opacity only, and
+  collapses under reduce-motion by construction. Loading is skeleton→content
+  (the Skeleton primitive mirrors the incoming layout — never prose; the
+  states sweep asserts the progressbar role). Touchables render through
+  PressableScale (scale + 44dp `sizes.minTarget` + optional haptic); cards
+  through Card; icons from the closed glyph set. One accent moment per region
+  (the accent budget). Empty states carry a primary action; error surfaces
+  keep their retry + three registers. UI diffs end with a `design-reviewer`
+  PASS.
+
 ## Provenance
 
 - Non-trivial decision sites (RLS SQL, jwtVerify/JWKS options, vector index
@@ -228,9 +245,9 @@ versions = `catalog:` (the catalog is the only place version numbers appear).
 - Reviewers are read-only subagents (the `docs-sync` gate asserts their
   frontmatter stays read-only): `security-reviewer` (MUST run on RLS/DAL/auth
   changes), `mobile-security-reviewer` (MUST run on keychain/api-client/
-  app.config/eas.json/permission changes), `accessibility-reviewer`,
-  `torvalds-reviewer` before finishing, `citation-verifier` via
-  `/verify-citations`.
+  app.config/eas.json/permission changes), `accessibility-reviewer` and
+  `design-reviewer` on UI changes, `torvalds-reviewer` before finishing,
+  `citation-verifier` via `/verify-citations`.
 - PRs paste real `pnpm validate` + `pnpm test:rls` output; CODEOWNERS
   ({{SECURITY_OWNERS}}) sign off on auth/data/harness surfaces. New MCP servers
   or Skills must be registered in `docs/security/approved-tools.md` first. Keep

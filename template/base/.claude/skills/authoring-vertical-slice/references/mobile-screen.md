@@ -32,6 +32,9 @@
   refuses to overwrite a hand-tuned flow) — and a row in
   `tools/startup-budget.json` (human-reviewed budget — propose the row in your
   report if you cannot write it).
+- **Design doctrine lives in the `designing-mobile-ui` skill** — surface
+  checklists, typography roles, motion, state choreography. Read its checklist
+  for this screen's surface type before composing.
 - **Styling is tokens-only** (the `styleguide` gate enforces it):
   `tools/styleguide.manifest.json` is the OKLCH source of truth, rendered by
   `tools/gen-theme.mjs` into the committed `src/theme/tokens.gen.ts` (regen-diffed

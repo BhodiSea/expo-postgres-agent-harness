@@ -561,6 +561,13 @@ flow and budget row; leave a stale row for a deleted route → FAIL.
   reviewed human act (empty reason FAILS; the file is write-guard-protected and
   gate-integrity-hashed). Never in the Stop chain — minutes vs the chain's
   seconds budget.
+- **osv-scan** (`osv-scan.yml`, its own workflow) — known-vulnerability SCA over
+  every discovered `pnpm-lock.yaml` against the OSV database. The PR job is
+  DIFF-AWARE (only newly introduced vulns red a PR — the deterministic form of a
+  vulnerability gate: an unchanged tree never reds on an upstream advisory); the
+  weekly full-tree scan owns time-based discovery; Renovate owns the fix path.
+  Google's official reusable workflows, SHA-pinned. This is why `pnpm audit`
+  stays out of the validate chain (see Considered and rejected).
 - **live-api proof** — `__tests__/live-api-proof.test.ts` (jest, self-skipping
   unless `LIVE_PROOF=1` + a running `AUTH_MODE=stub` server): the one place the
   mobile client's real api-client talks to the real server over real Postgres
@@ -615,6 +622,23 @@ in the design record; the enduring ones repeat here):
 - **ts-prune / lockfile-lint / type-coverage / markdownlint** — superseded by
   `knip --strict`, pnpm strict lockfiles + frozen CI installs, the type-aware
   ESLint bans, and Biome respectively.
+- **`pnpm audit` in the validate chain** — non-deterministic in TIME: a new
+  upstream advisory in the Expo dependency tree would red an unchanged tree —
+  and brick every fresh scaffold — and an allowlist only converts each advisory
+  into an emergency edit of a write-protected file. The `osv-scan` PR lane is
+  the deterministic form of the same control (diff-aware: only NEWLY introduced
+  vulns red a PR), the weekly full scan owns time-based discovery, and Renovate
+  owns the fix path.
+- **react-native-reanimated (0.1.2)** — a Babel transform plus a native worklet
+  runtime between the motion tokens and the pixels — the styling-compiler class,
+  for motion — when everything this tier needs (press scale, entrance
+  fade/slide, skeleton pulse) sits inside core `Animated`'s native-driver
+  whitelist with zero added dependencies. Revisit only for gesture-driven
+  surfaces (sheets/swipes), as an opt-in module.
+- **A runtime memory budget** — reaffirmed against the 0.1.2 perf wave: no
+  managed-runtime measurement is honest enough to gate on (a jest heap number
+  measures jest), so leak discipline stays the static effect-cleanup scan plus
+  the emitter-count spec, and unmeasured numbers do not ship.
 - **max-lines file/function caps** — proxy metrics that punish cohesive modules;
   sonarjs cognitive-complexity ≤ 15 targets the actual failure mode.
 - **deterministic same-turn test-edit bans** — a hook cannot distinguish
