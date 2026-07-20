@@ -178,7 +178,11 @@ jobs:
             const fs = require("node:fs")
             const f = "apps/mobile/app.config.ts"
             let s = fs.readFileSync(f, "utf8")
-            s = s.replace("supportsTablet: true,", "supportsTablet: true,\n      infoPlist: { NSAppTransportSecurity: { NSAllowsArbitraryLoads: true } },")
+            // Inject INTO the shipped infoPlist block (0.1.2 ships one for the
+            // export-compliance declaration) — a second infoPlist key would be
+            // shadowed by the later duplicate and the ATS hole would never
+            // reach the resolved config.
+            s = s.replace("ITSAppUsesNonExemptEncryption: false,", "ITSAppUsesNonExemptEncryption: false,\n        NSAppTransportSecurity: { NSAllowsArbitraryLoads: true },")
             s = s.replace("adaptiveIcon: {", "permissions: [\"android.permission.CAMERA\"],\n      adaptiveIcon: {")
             s = s.replace("extra: {", "extra: {\n      canaryApiKey: \"shipped-in-bundle\",")
             fs.writeFileSync(f, s)

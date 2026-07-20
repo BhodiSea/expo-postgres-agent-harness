@@ -709,6 +709,10 @@ function checkTracking(policy) {
 // default; an unknown Expo SDK major fails CLOSED until a human pins it.
 // SOURCE: https://developer.android.com/google/play/requirements/target-sdk
 function checkTargetSdk(policy) {
+  // Annotated, not bare: closure assignments are invisible to the checker's
+  // evolving-type inference (the perf-subject-cli precedent) — a bare `let`
+  // would read as plain `undefined` at every use below.
+  /** @type {number | undefined} */
   let declared
   const walk = (node) => {
     if (node === null || typeof node !== 'object') return
@@ -719,10 +723,13 @@ function checkTargetSdk(policy) {
   }
   walk(cfg)
   const { floor, expoSdkDefaults } = policy.androidTargetSdk
-  if (declared !== undefined) {
-    if (declared < floor) {
+  // Copied to a const first: the closure-assigned `let` is exempt from
+  // control-flow narrowing (the perf-subject-cli precedent).
+  const declaredTarget = declared
+  if (declaredTarget !== undefined) {
+    if (declaredTarget < floor) {
       errs.push(
-        `targetSdkVersion ${String(declared)} declared below the Play floor ${String(floor)} (${STORE_FILE}) — Play rejects new builds targeting stale API levels`,
+        `targetSdkVersion ${String(declaredTarget)} declared below the Play floor ${String(floor)} (${STORE_FILE}) — Play rejects new builds targeting stale API levels`,
       )
     }
     return
