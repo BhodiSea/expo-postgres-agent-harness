@@ -21,11 +21,12 @@ import {
   resolveDevJwksPath,
   type TokenVerifier,
 } from './auth/verify.js'
+import { accountDal } from './dal/account.js'
 import { decodeNotesCursor } from './dal/cursor.js'
 import { notesDal } from './dal/notes.js'
 import { apiError, notFoundHandler, onErrorHandler, requestId, validationHook } from './errors.js'
 import { createSkewMiddleware } from './middleware/skew.js'
-import type { AppEnv, NotesDal } from './types.js'
+import type { AccountDal, AppEnv, NotesDal } from './types.js'
 
 const SSE_DEMO_TICKS = 3
 
@@ -153,6 +154,26 @@ const deleteNoteRoute = createRoute({
     404: errorResponse('No such note visible to this user'),
   },
 })
+
+// In-app account deletion. With no users table, the authenticated user's data
+// IS their account on this server; the client drops its local session after.
+// SOURCE: Apple App Review Guideline 5.1.1(v) — apps that support account
+// creation must let users initiate account deletion within the app
+// https://developer.apple.com/app-store/review/guidelines/#5.1.1
+const deleteAccountRoute = createRoute({
+  method: 'delete',
+  path: '/api/me',
+  security: [{ Bearer: [] }],
+  responses: {
+    204: {
+      description:
+        'Account deletion: every row owned by the authenticated user is deleted under ' +
+        'FORCE RLS (Apple 5.1.1(v) in-app account deletion; the client clears its local ' +
+        'session afterwards)',
+    },
+    ...guardedRouteErrors,
+  },
+})
 // Stryker restore all
 
 // The mobile app is NOT a CORS client. A native fetch runs outside any browser: it sends
@@ -187,6 +208,8 @@ export interface AppOptions {
   readonly verifyToken?: TokenVerifier
   /** Notes DAL; tests inject fakes here. */
   readonly notesDal?: NotesDal
+  /** Account DAL (in-app account deletion); tests inject fakes here. */
+  readonly accountDal?: AccountDal
   /** Milliseconds between SSE demo ticks. */
   readonly sseTickMs?: number
   /** Test hook: invoked when an SSE client aborts mid-stream. */
@@ -206,6 +229,7 @@ export function createApp(options: AppOptions = {}): OpenAPIHono<AppEnv> {
   const version = options.version ?? readPackageVersion()
   const verifyToken = options.verifyToken ?? createTokenVerifier(process.env)
   const dal = options.notesDal ?? notesDal
+  const account = options.accountDal ?? accountDal
   const sseTickMs = options.sseTickMs ?? 250
   const onSseAbort = options.onSseAbort
   const corsOrigins = options.corsOrigins ?? resolveCorsOrigins(process.env)
@@ -331,6 +355,13 @@ export function createApp(options: AppOptions = {}): OpenAPIHono<AppEnv> {
     const { id } = c.req.valid('param')
     const removed = await dal.remove(c.get('userId'), id)
     return removed ? c.body(null, 204) : apiError(c, 404, 'not_found', 'no such note')
+  })
+
+  app.openapi(deleteAccountRoute, async (c) => {
+    // Idempotent by construction: deleting zero rows is still a completed
+    // deletion — 204 either way, so a retry after a dropped response succeeds.
+    await account.deleteAllOwnedData(c.get('userId'))
+    return c.body(null, 204)
   })
 
   // SSE demo: streams three ticks then closes. Not part of the OpenAPI surface

@@ -20,7 +20,7 @@ import { createStubProvider } from '../src/auth/providers/stub'
 import { installSessionProvider, sessionProvider } from '../src/auth/session'
 import { useKeysetQuery } from '../src/features/matrix/useKeysetQuery'
 import { useCreateNote } from '../src/features/notes/useCreateNote'
-import { apiFetch } from '../src/lib/api-client'
+import { apiDelete, apiFetch } from '../src/lib/api-client'
 import { type SseEvent, streamApiSse } from '../src/lib/sse'
 
 // The host keychain is the ONE mocked seam (no native keystore under jest);
@@ -181,5 +181,27 @@ describeLive('live API proof (real server, real Postgres, FORCE RLS)', () => {
 
     say('TRANSCRIPT COMPLETE')
     expect(transcript.at(-1)).toBe('TRANSCRIPT COMPLETE')
+  })
+
+  it('account deletion (Apple 5.1.1(v)): DELETE /api/me sweeps the account through the one door', async () => {
+    // Fresh session, fresh data — then the deletion the store reviewer looks for.
+    installSessionProvider(createStubProvider())
+    await sessionProvider().signIn()
+    const create = renderHook(() => useCreateNote(jest.fn()))
+    await act(async () => {
+      await create.result.current.submit({ title: `to be deleted ${String(Date.now())}` })
+    })
+    say('account-deletion fixture: signed in and created one note')
+
+    const del = await apiDelete('/api/me')
+    expect(del.status).toBe(204)
+
+    // The account is empty on the server: a fresh list under the SAME identity
+    // comes back with zero rows (RLS scopes the page to this user).
+    const list = renderHook(() => useKeysetQuery(jest.fn()))
+    await waitFor(() => {
+      expect(list.result.current.state.status === 'empty').toBe(true)
+    })
+    say('account deleted: DELETE /api/me answered 204 and the reloaded page is empty')
   })
 })

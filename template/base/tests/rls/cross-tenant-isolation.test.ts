@@ -124,6 +124,31 @@ if (!RLS_SUITE_READY) {
         expect(rows).toHaveLength(0)
       }
     })
+
+    // The account-deletion sweep (Apple 5.1.1(v)) — the LIVE half of the slice:
+    // accountDal.deleteAllOwnedData emits an unqualified DELETE (statement shape
+    // pinned by apps/server/src/dal/account.test.ts), so under FORCE RLS the
+    // policy qual must be the ONLY thing separating "delete my account" from
+    // "delete the table". Runs LAST in this describe: it empties user A.
+    it.each(
+      ISOLATION_TARGETS,
+    )('account deletion in $table: an unqualified DELETE as A sweeps ONLY A — B survives', async (t) => {
+      // Fresh seeds for both users through the RLS path.
+      for (const user of [USER_A, USER_B]) {
+        await withUser(sql, user, async (tx) => {
+          await tx`INSERT INTO ${tx(t.table)} ${tx(t.seedRow(user))}`
+        })
+      }
+      // The DAL's exact statement shape: DELETE with NO application WHERE.
+      const swept = await withUser(sql, USER_A, (tx) => tx`DELETE FROM ${tx(t.table)}`)
+      expect(swept.count).toBeGreaterThanOrEqual(1)
+      // A's account is empty…
+      const aRows = await withUser(sql, USER_A, (tx) => tx`SELECT * FROM ${tx(t.table)}`)
+      expect(aRows).toHaveLength(0)
+      // …and B's data SURVIVED the unqualified sweep — the whole point.
+      const bRows = await withUser(sql, USER_B, (tx) => tx`SELECT * FROM ${tx(t.table)}`)
+      expect(bRows.length).toBeGreaterThanOrEqual(1)
+    })
   })
 
   describe('catalog gate (pg_catalog facts, not vibes)', () => {

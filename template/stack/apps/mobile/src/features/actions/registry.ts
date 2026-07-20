@@ -26,6 +26,12 @@ export interface ActionContext {
   readonly navigate: (path: string) => void
   /** Drop the session and return to sign-in. */
   readonly signOut: () => Promise<void>
+  /**
+   * In-app account deletion (Apple 5.1.1(v)): the host confirms destructively,
+   * calls DELETE /api/me, then signs out. Fire-and-forget from a command's
+   * point of view — the host owns the confirm/error choreography.
+   */
+  readonly deleteAccount: () => void
 }
 
 export interface ActionCommand {
@@ -76,6 +82,17 @@ export const ACTION_COMMANDS: readonly ActionCommand[] = [
     group: 'session',
     run: (context) => {
       void context.signOut()
+    },
+  },
+  {
+    // In-app account deletion — the store-compliance surface (Apple 5.1.1(v)):
+    // the expo-policy gate's account-deletion closure asserts this id exists
+    // whenever the app ships an auth surface.
+    id: 'session.deleteAccount',
+    titleKey: 'command.deleteAccount',
+    group: 'session',
+    run: (context) => {
+      context.deleteAccount()
     },
   },
 ]

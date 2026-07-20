@@ -30,3 +30,12 @@ export interface NotesDal {
   get(userId: string, id: string): Promise<Note | null>
   remove(userId: string, id: string): Promise<boolean>
 }
+
+/**
+ * The account data-access contract (in-app account deletion — Apple 5.1.1(v)).
+ * With no users table, deletion means removing every row the user owns; the
+ * count comes back so tests can assert the deletion actually swept something.
+ */
+export interface AccountDal {
+  deleteAllOwnedData(userId: string): Promise<{ readonly deletedNotes: number }>
+}

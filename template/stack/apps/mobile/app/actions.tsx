@@ -1,12 +1,13 @@
 import { router } from 'expo-router'
 import { useState } from 'react'
-import { ScrollView, View } from 'react-native'
+import { Alert, ScrollView, View } from 'react-native'
 import { sessionProvider } from '../src/auth/session'
 import { AppText } from '../src/components/AppText'
 import { EmptyState } from '../src/components/EmptyState'
 import { Input } from '../src/components/Input'
 import { OptionRow } from '../src/components/OptionRow'
 import { Screen } from '../src/components/Screen'
+import { useToast } from '../src/components/Toast'
 import { rankCommands } from '../src/features/actions/fuzzyScore'
 import { pushRecent, readRecents } from '../src/features/actions/recents'
 import {
@@ -16,6 +17,8 @@ import {
   type ActionGroup,
 } from '../src/features/actions/registry'
 import { type MessageKey, useI18n } from '../src/i18n'
+import { translateError } from '../src/i18n/errors'
+import { apiDelete } from '../src/lib/api-client'
 import { ROUTES } from '../src/routes'
 import { useThemedStyles } from '../src/theme/theme'
 import { spacing } from '../src/theme/tokens.gen'
@@ -112,6 +115,7 @@ const actionStyles = () => ({
 export default function ActionsModal() {
   const { t } = useI18n()
   const styles = useThemedStyles(actionStyles)
+  const toast = useToast()
   const [query, setQuery] = useState('')
   // Raw persisted ids, read once at mount; every run keeps this in sync via
   // pushRecent's return value, so no render-time storage read can go stale
@@ -134,6 +138,34 @@ export default function ActionsModal() {
     signOut: async () => {
       await sessionProvider().signOut()
       router.replace('/sign-in')
+    },
+    deleteAccount: () => {
+      // Destructive two-step: the native confirm is the second step Apple's
+      // reviewers look for — no accidental single-tap deletion. On confirm:
+      // server-side deletion first (DELETE /api/me — every owned row, under
+      // FORCE RLS), then the local session drops and the app returns to
+      // sign-in. Failures surface as the envelope-code toast (the notes
+      // write-UX pattern) and the session survives — nothing half-deletes.
+      // SOURCE: Apple App Review Guideline 5.1.1(v) — in-app account deletion
+      // https://developer.apple.com/app-store/review/guidelines/#5.1.1
+      Alert.alert(t('account.delete.confirmTitle'), t('account.delete.confirmBody'), [
+        { text: t('account.delete.cancel'), style: 'cancel' },
+        {
+          text: t('account.delete.confirm'),
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                await apiDelete('/api/me')
+                await sessionProvider().signOut()
+                router.replace('/sign-in')
+              } catch (error) {
+                toast.show(translateError(error).message, 'error')
+              }
+            })()
+          },
+        },
+      ])
     },
   }
 

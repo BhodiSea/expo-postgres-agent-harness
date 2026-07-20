@@ -99,6 +99,14 @@ export const en = {
   'command.goMatrix': 'Go to Matrix',
   'command.createNote': 'Create a note',
   'command.signOut': 'Sign out',
+  'command.deleteAccount': 'Delete account…',
+  // In-app account deletion (Apple 5.1.1(v)) — the ellipsis on the command and
+  // this native confirm are the deliberate two-step.
+  'account.delete.confirmTitle': 'Delete account?',
+  'account.delete.confirmBody':
+    'This permanently deletes your data on this server and signs you out. It cannot be undone.',
+  'account.delete.confirm': 'Delete',
+  'account.delete.cancel': 'Cancel',
 
   // ---- sign-in (dev) ----------------------------------------------------------
   'signin.title': 'Sign in',

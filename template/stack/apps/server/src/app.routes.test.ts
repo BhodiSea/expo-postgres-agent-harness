@@ -22,7 +22,7 @@ import {
 import { describe, expect, it } from 'vitest'
 import { type AppOptions, createApp } from './app.js'
 import { encodeNotesCursor, type NoteCursorKey } from './dal/cursor.js'
-import type { NotesDal } from './types.js'
+import type { AccountDal, NotesDal } from './types.js'
 
 const USER_ID = '11111111-1111-4111-8111-111111111111'
 const NOTE_ID = '3f2504e0-4f89-41d3-9a0c-0305e82c3301'
@@ -46,6 +46,7 @@ interface DalCalls {
   readonly create: { userId: string; input: NewNote }[]
   readonly get: { userId: string; id: string }[]
   readonly remove: { userId: string; id: string }[]
+  readonly deleteAccount: { userId: string }[]
 }
 
 interface DalResults {
@@ -53,6 +54,7 @@ interface DalResults {
   readonly created?: Note
   readonly found?: Note | null
   readonly removed?: boolean
+  readonly deletedNotes?: number
 }
 
 interface Fixture {
@@ -62,7 +64,7 @@ interface Fixture {
 
 /** A DAL that records every argument the routes hand it and replays canned results. */
 function fixture(results: DalResults = {}): Fixture {
-  const calls: DalCalls = { list: [], create: [], get: [], remove: [] }
+  const calls: DalCalls = { list: [], create: [], get: [], remove: [], deleteAccount: [] }
   const notesDal: NotesDal = {
     list: (userId, page) => {
       calls.list.push({ userId, limit: page.limit, cursor: page.cursor })
@@ -83,11 +85,18 @@ function fixture(results: DalResults = {}): Fixture {
       return Promise.resolve(results.removed ?? false)
     },
   }
+  const accountDal: AccountDal = {
+    deleteAllOwnedData: (userId) => {
+      calls.deleteAccount.push({ userId })
+      return Promise.resolve({ deletedNotes: results.deletedNotes ?? 0 })
+    },
+  }
   return {
     options: {
       version: '1.2.3',
       verifyToken: () => Promise.resolve({ userId: USER_ID }),
       notesDal,
+      accountDal,
     },
     calls,
   }
@@ -236,5 +245,36 @@ describe('DELETE /api/notes/{id}', () => {
       message: 'no such note',
     })
     expect(calls.remove).toEqual([{ userId: USER_ID, id: NOTE_ID }])
+  })
+})
+
+describe('DELETE /api/me — in-app account deletion (Apple 5.1.1(v))', () => {
+  it('deletes as the VERIFIED identity and answers 204 with no body', async () => {
+    const { options, calls } = fixture({ deletedNotes: 3 })
+
+    const res = await createApp(options).request('/api/me', { method: 'DELETE', headers: authed })
+
+    expect(res.status).toBe(204)
+    expect(await res.text()).toBe('')
+    expect(calls.deleteAccount).toEqual([{ userId: USER_ID }])
+  })
+
+  it('is idempotent: deleting an already-empty account is still a completed 204', async () => {
+    const { options, calls } = fixture({ deletedNotes: 0 })
+
+    const res = await createApp(options).request('/api/me', { method: 'DELETE', headers: authed })
+
+    expect(res.status).toBe(204)
+    expect(calls.deleteAccount).toHaveLength(1)
+  })
+
+  it('an unauthenticated deletion never reaches the DAL — 401 envelope', async () => {
+    const { options, calls } = fixture()
+
+    const res = await createApp(options).request('/api/me', { method: 'DELETE' })
+
+    expect(res.status).toBe(401)
+    expect(ApiError.parse(await res.json()).error.code).toBe('unauthorized')
+    expect(calls.deleteAccount).toEqual([])
   })
 })

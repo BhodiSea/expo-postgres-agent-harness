@@ -185,3 +185,8 @@ export async function apiPost(
   headers.set('content-type', 'application/json')
   return apiFetch(path, { ...init, method: 'POST', headers, body: JSON.stringify(body) })
 }
+
+/** apiFetch with method DELETE — no body; the one-door stays the one door. */
+export async function apiDelete(path: string, init: ApiFetchInit = {}): Promise<Response> {
+  return apiFetch(path, { ...init, method: 'DELETE' })
+}

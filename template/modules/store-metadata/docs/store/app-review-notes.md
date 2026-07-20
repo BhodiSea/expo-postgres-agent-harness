@@ -16,6 +16,14 @@ account" below).
 > FILL IN: two or three sentences. What {{PROJECT_NAME}} does, who it is for,
 > and what the reviewer should try first.
 
+## Account deletion (5.1.1(v)) — where the reviewer finds it
+
+The app supports in-app account deletion out of the box: **Actions → "Delete
+account…"** (the command palette), behind a native destructive confirm. It
+calls `DELETE /api/me`, which removes every row the signed-in user owns under
+FORCE RLS, then signs the user out. Say so in the notes field — reviewers
+look for the path, and naming it avoids a rejection round-trip.
+
 ## Sign-in for review
 
 The scaffold authenticates against your organization's identity provider, so an

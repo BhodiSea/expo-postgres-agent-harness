@@ -4,6 +4,7 @@
 // in-memory (the native kv-store is absent under jest and the corrupt-safe kv
 // would silently read empty — the recents behavior needs a store that works).
 import { fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library'
+import { Alert } from 'react-native'
 import { en } from '../src/i18n/catalog'
 import { installMockServer, uninstallMockServer } from '../src/testing/mock-server'
 
@@ -81,6 +82,7 @@ describe('actions modal sections + ranking', () => {
       en['command.goMatrix'],
       en['command.createNote'],
       en['command.signOut'],
+      en['command.deleteAccount'],
     ])
   })
 
@@ -190,5 +192,87 @@ describe('actions modal commands', () => {
     await pressFirst('action-session.signOut')
 
     expect(await screen.findByTestId('sign-in-screen')).toBeTruthy()
+  })
+})
+
+// ---- account deletion (Apple 5.1.1(v)) --------------------------------------
+
+interface AlertButton {
+  readonly text?: string
+  readonly style?: string
+  readonly onPress?: () => void
+}
+
+/** The app network plus a recordable DELETE /api/me (204 is unrepresentable in
+ *  the mock's JSON envelope — a 200 body stands in; apiFetch only reads ok). */
+function installDeletionNetwork(onDelete: () => { status: number; body: unknown }): void {
+  installMockServer({
+    'GET /healthz': HEALTH,
+    'GET /api/notes': emptyPage,
+    'GET /api/notes?limit=50': emptyPage,
+    'DELETE /api/me': onDelete,
+  })
+}
+
+describe('actions modal account deletion (Apple 5.1.1(v))', () => {
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
+  it('the command asks for native confirmation first — cancel sends NOTHING', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined)
+    let hits = 0
+    installDeletionNetwork(() => {
+      hits += 1
+      return { status: 200, body: { ok: true } }
+    })
+    renderRouter('./app', { initialUrl: '/actions' })
+
+    await pressFirst('action-session.deleteAccount')
+
+    expect(alert).toHaveBeenCalledWith(
+      en['account.delete.confirmTitle'],
+      en['account.delete.confirmBody'],
+      expect.any(Array),
+    )
+    const buttons = (alert.mock.calls.at(-1)?.[2] ?? []) as readonly AlertButton[]
+    buttons.find((b) => b.style === 'cancel')?.onPress?.()
+    expect(hits).toBe(0)
+  })
+
+  it('confirm deletes on the server, drops the session, and lands on sign-in', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined)
+    let hits = 0
+    installDeletionNetwork(() => {
+      hits += 1
+      return { status: 200, body: { ok: true } }
+    })
+    renderRouter('./app', { initialUrl: '/actions' })
+
+    await pressFirst('action-session.deleteAccount')
+    const buttons = (alert.mock.calls.at(-1)?.[2] ?? []) as readonly AlertButton[]
+    const confirm = buttons.find((b) => b.style === 'destructive')
+    expect(confirm?.text).toBe(en['account.delete.confirm'])
+    confirm?.onPress?.()
+
+    expect(await screen.findByTestId('sign-in-screen')).toBeTruthy()
+    expect(hits).toBe(1)
+  })
+
+  it('a failed server deletion keeps the session and surfaces the envelope toast', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined)
+    installDeletionNetwork(() => ({
+      status: 500,
+      body: { error: { code: 'internal', message: 'deletion exploded' } },
+    }))
+    renderRouter('./app', { initialUrl: '/actions' })
+
+    await pressFirst('action-session.deleteAccount')
+    const buttons = (alert.mock.calls.at(-1)?.[2] ?? []) as readonly AlertButton[]
+    buttons.find((b) => b.style === 'destructive')?.onPress?.()
+
+    expect(await screen.findByTestId('toast-error')).toBeTruthy()
+    // Nothing half-deletes: the failure keeps the session, no sign-in redirect.
+    expect(screen.queryByTestId('sign-in-screen')).toBeNull()
   })
 })

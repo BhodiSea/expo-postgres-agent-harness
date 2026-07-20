@@ -17,6 +17,192 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/me": {
+      "delete": {
+        "responses": {
+          "204": {
+            "description": "Account deletion: every row owned by the authenticated user is deleted under FORCE RLS (Apple 5.1.1(v) in-app account deletion; the client clears its local session afterwards)"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "bad_request",
+                            "unauthorized",
+                            "not_found",
+                            "payload_too_large",
+                            "version_skew",
+                            "internal"
+                          ],
+                          "type": "string"
+                        },
+                        "message": {
+                          "maxLength": 1024,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Request validation failed (envelope code bad_request)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "bad_request",
+                            "unauthorized",
+                            "not_found",
+                            "payload_too_large",
+                            "version_skew",
+                            "internal"
+                          ],
+                          "type": "string"
+                        },
+                        "message": {
+                          "maxLength": 1024,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Missing or unverifiable bearer token"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "bad_request",
+                            "unauthorized",
+                            "not_found",
+                            "payload_too_large",
+                            "version_skew",
+                            "internal"
+                          ],
+                          "type": "string"
+                        },
+                        "message": {
+                          "maxLength": 1024,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Client major version does not match the server (code version_skew)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "bad_request",
+                            "unauthorized",
+                            "not_found",
+                            "payload_too_large",
+                            "version_skew",
+                            "internal"
+                          ],
+                          "type": "string"
+                        },
+                        "message": {
+                          "maxLength": 1024,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unexpected server error — correlate via error.requestId"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/notes": {
       "get": {
         "parameters": [

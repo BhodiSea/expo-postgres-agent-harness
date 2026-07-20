@@ -28,6 +28,7 @@
 // The probe runs `EXPLAIN` — it PLANS, it never EXECUTES — so registering create/remove
 // shapes writes and deletes nothing.
 // SOURCE: docs/harness/gates-catalog.md (rls-isolation — DAL plan probe) [corpus: harness/doctrine]
+import { accountDal } from '../../apps/server/src/dal/account.js'
 import { notesDal } from '../../apps/server/src/dal/notes.js'
 
 /** Plan-node types the probe rejects outright, unless a shape allows one by name. */
@@ -99,5 +100,15 @@ export const DAL_SHAPES: readonly DalShape[] = [
     method: 'notesDal.remove',
     table: 'notes',
     run: (userId) => notesDal.remove(userId, ABSENT_ID),
+  },
+  {
+    // Account deletion (Apple 5.1.1(v)): a DELETE with no application WHERE —
+    // the RLS policy qual IS the filter, so the plan must still reach the
+    // owner's partition through the owner-leading index (at 1% estimated
+    // selectivity a Seq Scan here would be the silent full-table walk).
+    id: 'accountDal.deleteAllOwnedData',
+    method: 'accountDal.deleteAllOwnedData',
+    table: 'notes',
+    run: (userId) => accountDal.deleteAllOwnedData(userId),
   },
 ]
