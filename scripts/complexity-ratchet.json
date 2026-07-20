@@ -12,6 +12,7 @@
     "scripts/check-reuse.mjs::reuseProblems": 22,
     "template/base/tools/check-expo-policy.mjs::checkEasJson": 16,
     "template/base/tools/lib/agent-roster.mjs::parseFrontmatter": 29,
+    "template/base/tools/lib/png.mjs::unfilter": 21,
     "template/base/tools/lib/jsonc.mjs::parseJsonc": 24
   }
 }

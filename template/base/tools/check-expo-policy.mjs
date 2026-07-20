@@ -446,9 +446,29 @@ function resolvedPluginNames() {
     .filter((n) => typeof n === 'string')
 }
 
+/** One legal accountDeletion shape per surface kind — the reviewed escapes included. */
+function accountDeletionShapeOk(ad) {
+  return (
+    (ad?.surface === 'action' &&
+      typeof ad.actionId === 'string' &&
+      ad.actionId !== '' &&
+      typeof ad.serverPath === 'string' &&
+      ad.serverPath.startsWith('/')) ||
+    (ad?.surface === 'route' &&
+      typeof ad.routeId === 'string' &&
+      ad.routeId !== '' &&
+      typeof ad.serverPath === 'string') ||
+    (ad?.surface === 'external' &&
+      typeof ad.url === 'string' &&
+      ad.url.startsWith('https://') &&
+      typeof ad.reason === 'string' &&
+      ad.reason.trim() !== '') ||
+    (ad?.surface === 'none' && typeof ad.reason === 'string' && ad.reason.trim() !== '')
+  )
+}
+
 // Load + shape-check the policy. Malformed fails CLOSED — the store checks can
 // never silently disarm; a missing file is a red via readJson.
-// eslint-disable-next-line sonarjs/cognitive-complexity -- ceiling is machine-enforced by scripts/complexity-ratchet.json; this directive only silences the rule, the ratchet is what stops the score growing
 function loadStorePolicy() {
   const p = readJson(STORE_FILE)
   if (p === null) return null
@@ -505,24 +525,7 @@ function loadStorePolicy() {
   ) {
     badly('privacyAccessedApiTypes must be an array of { category, reasons (non-empty), why }')
   }
-  const ad = p.accountDeletion
-  const adOk =
-    (ad?.surface === 'action' &&
-      typeof ad.actionId === 'string' &&
-      ad.actionId !== '' &&
-      typeof ad.serverPath === 'string' &&
-      ad.serverPath.startsWith('/')) ||
-    (ad?.surface === 'route' &&
-      typeof ad.routeId === 'string' &&
-      ad.routeId !== '' &&
-      typeof ad.serverPath === 'string') ||
-    (ad?.surface === 'external' &&
-      typeof ad.url === 'string' &&
-      ad.url.startsWith('https://') &&
-      typeof ad.reason === 'string' &&
-      ad.reason.trim() !== '') ||
-    (ad?.surface === 'none' && typeof ad.reason === 'string' && ad.reason.trim() !== '')
-  if (!adOk)
+  if (!accountDeletionShapeOk(p.accountDeletion))
     badly(
       'accountDeletion must be one of { surface: "action", actionId, serverPath } | { surface: "route", routeId, serverPath } | { surface: "external", url: https, reason } | { surface: "none", reason }',
     )
@@ -539,11 +542,7 @@ function loadStorePolicy() {
 // surface visible before prebuild; a bare npm dep touching a sensitive API is
 // invisible here — Apple's post-submission validation is the backstop.
 // SOURCE: https://developer.apple.com/documentation/bundleresources/information-property-list/protected-resources
-function checkUsageDescriptions(policy) {
-  const file = readJson(PERMS_FILE)
-  if (file === null) return
-  const infoPlist = cfg.ios?.infoPlist ?? {}
-  const declared = Object.keys(infoPlist).filter((k) => k.endsWith('UsageDescription'))
+function reviewedUsageKeys(file) {
   const reviewed = new Set()
   for (const entry of file.ios ?? []) {
     if (
@@ -559,6 +558,15 @@ function checkUsageDescriptions(policy) {
     }
     reviewed.add(entry.key)
   }
+  return reviewed
+}
+
+function checkUsageDescriptions(policy) {
+  const file = readJson(PERMS_FILE)
+  if (file === null) return
+  const infoPlist = cfg.ios?.infoPlist ?? {}
+  const declared = Object.keys(infoPlist).filter((k) => k.endsWith('UsageDescription'))
+  const reviewed = reviewedUsageKeys(file)
   for (const key of declared) {
     if (!reviewed.has(key)) {
       errs.push(
@@ -737,60 +745,64 @@ function checkTargetSdk(policy) {
 // deliberately); the policy escalates it to red as a pre-submission step.
 // SOURCE: Apple HIG app icons — the 1024×1024 marketing icon must be opaque
 // https://developer.apple.com/design/human-interface-guidelines/app-icons#App-icon-sizes
-function checkIconIntegrity(policy) {
-  const escalate = policy.icons.solidColorPlaceholder === 'error'
-  const iconSites = []
-  if (typeof cfg.icon === 'string')
-    iconSites.push(['icon', cfg.icon, { square: 1024, opaque: true }])
+function iconSitesOf() {
+  const sites = []
+  if (typeof cfg.icon === 'string') sites.push(['icon', cfg.icon, { square: 1024, opaque: true }])
   else
     errs.push(
       `icon is ${JSON.stringify(cfg.icon)} — the app icon must be declared (Expo derives every store size from it)`,
     )
   const ios = cfg.ios?.icon
   for (const [k, v] of typeof ios === 'string' ? [['ios.icon', ios]] : Object.entries(ios ?? {})) {
-    if (typeof v === 'string') iconSites.push([`ios.icon.${k}`, v, { square: 1024, opaque: true }])
+    if (typeof v === 'string') sites.push([`ios.icon.${k}`, v, { square: 1024, opaque: true }])
   }
   const adaptive = cfg.android?.adaptiveIcon ?? {}
   for (const key of ['foregroundImage', 'monochromeImage', 'backgroundImage']) {
     if (typeof adaptive[key] === 'string')
-      iconSites.push([`android.adaptiveIcon.${key}`, adaptive[key], { square: 1024 }])
+      sites.push([`android.adaptiveIcon.${key}`, adaptive[key], { square: 1024 }])
   }
   const splashImage = (cfg.plugins ?? []).find(
     (p) => Array.isArray(p) && p[0] === 'expo-splash-screen',
   )?.[1]?.image
-  if (typeof splashImage === 'string') iconSites.push(['expo-splash-screen image', splashImage, {}])
-  for (const [site, rel, wants] of iconSites) {
-    const path = `${APP}/${rel.replace(/^\.\//, '')}`
-    if (!existsSync(path)) {
-      errs.push(
-        `${site} names "${rel}" but ${path} does not exist — a dangling asset fails the store build long after this chain went green`,
-      )
-      continue
-    }
-    const buffer = readFileSync(path)
-    const meta = readPngMeta(buffer)
-    if (meta === null) {
-      errs.push(`${site} (${path}) is not a structurally sound PNG — store pipelines reject it`)
-      continue
-    }
-    if (
-      wants.square !== undefined &&
-      (meta.width !== wants.square || meta.height !== wants.square)
-    ) {
-      errs.push(
-        `${site} (${path}) is ${String(meta.width)}×${String(meta.height)} — must be ${String(wants.square)}×${String(wants.square)} (Expo derives every density from it)`,
-      )
-    }
-    if (wants.opaque === true && meta.hasAlpha) {
-      errs.push(
-        `${site} (${path}) carries an alpha channel — App Store Connect rejects transparency in the marketing icon; flatten it onto a background`,
-      )
-    }
-    if (isSolidColor(buffer) === true) {
-      const line = `${site} (${path}) is a solid-color placeholder — ship real art before submission (flip ${STORE_FILE} icons.solidColorPlaceholder to "error" as the pre-submission step)`
-      if (escalate) errs.push(line)
-      else console.log(`${GATE}: NOTE — ${line}`)
-    }
+  if (typeof splashImage === 'string') sites.push(['expo-splash-screen image', splashImage, {}])
+  return sites
+}
+
+function checkIconSite(site, rel, wants, escalate) {
+  const path = `${APP}/${rel.replace(/^\.\//, '')}`
+  if (!existsSync(path)) {
+    errs.push(
+      `${site} names "${rel}" but ${path} does not exist — a dangling asset fails the store build long after this chain went green`,
+    )
+    return
+  }
+  const buffer = readFileSync(path)
+  const meta = readPngMeta(buffer)
+  if (meta === null) {
+    errs.push(`${site} (${path}) is not a structurally sound PNG — store pipelines reject it`)
+    return
+  }
+  if (wants.square !== undefined && (meta.width !== wants.square || meta.height !== wants.square)) {
+    errs.push(
+      `${site} (${path}) is ${String(meta.width)}×${String(meta.height)} — must be ${String(wants.square)}×${String(wants.square)} (Expo derives every density from it)`,
+    )
+  }
+  if (wants.opaque === true && meta.hasAlpha) {
+    errs.push(
+      `${site} (${path}) carries an alpha channel — App Store Connect rejects transparency in the marketing icon; flatten it onto a background`,
+    )
+  }
+  if (isSolidColor(buffer) === true) {
+    const line = `${site} (${path}) is a solid-color placeholder — ship real art before submission (flip ${STORE_FILE} icons.solidColorPlaceholder to "error" as the pre-submission step)`
+    if (escalate) errs.push(line)
+    else console.log(`${GATE}: NOTE — ${line}`)
+  }
+}
+
+function checkIconIntegrity(policy) {
+  const escalate = policy.icons.solidColorPlaceholder === 'error'
+  for (const [site, rel, wants] of iconSitesOf()) {
+    checkIconSite(site, rel, wants, escalate)
   }
 }
 

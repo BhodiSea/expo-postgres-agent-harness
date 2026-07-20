@@ -60,6 +60,7 @@ function paeth(a, b, c) {
 }
 
 /** Reverse the per-scanline filters in place; returns the raw pixel rows. */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- the five PNG filter cases are one cohesive decoder; ceiling machine-enforced by scripts/complexity-ratchet.json
 function unfilter(raw, width, height, bpp) {
   const stride = width * bpp
   const out = Buffer.alloc(stride * height)
