@@ -487,6 +487,20 @@ jobs:
         working-directory: apps/mobile
         run: npx expo-doctor
 
+      # The REAL targetSdk is a gradle fact only prebuild can materialize — the
+      # expo-policy gate's pre-prebuild check (declared value or the pinned
+      # per-SDK default in tools/store-policy.json) closes here against the
+      # generated project: Play rejects new builds targeting stale API levels.
+      - name: targetSdk floor (the generated project vs tools/store-policy.json)
+        run: |
+          floor="$(node -p "require('./tools/store-policy.json').androidTargetSdk.floor")"
+          target="$(grep -rhoE 'targetSdkVersion\s*=?\s*[0-9]+' apps/mobile/android --include=build.gradle --include=gradle.properties --include='*.gradle' | grep -oE '[0-9]+' | sort -n | tail -1)"
+          echo "generated targetSdkVersion: ${target:-<none>} (floor ${floor})"
+          if [ -z "$target" ] || [ "$target" -lt "$floor" ]; then
+            echo "::error::generated android project targets SDK '${target:-none}', below the Play floor ${floor} (tools/store-policy.json) — Play rejects new builds targeting stale API levels"
+            exit 1
+          fi
+
       - name: Gradle assembleDebug (the generated project actually builds)
         working-directory: apps/mobile/android
         run: ./gradlew assembleDebug

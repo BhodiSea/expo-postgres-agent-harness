@@ -32,11 +32,27 @@
 //      distribution, no autoIncrement, no secret-shaped env NAMES
 //  10. CNG purity (shared assert): apps/mobile/{android,ios} untracked AND
 //      ignored — prebuild output is generated, never committed
+//  11. STORE READINESS (0.1.2, driven by tools/store-policy.json — reviewed
+//      data, write-guard-protected; a malformed policy fails CLOSED): iOS
+//      usage-description strings reviewed bidirectionally + non-placeholder +
+//      plugin-implied keys present; ITSAppUsesNonExemptEncryption explicitly
+//      declared (export compliance); ios.privacyManifests shape + reviewed
+//      lockstep when declared (never required — SDK packages self-declare
+//      their own manifests; absence gets a NOTE); App Tracking Transparency
+//      consistency in BOTH directions (no tracking signal → no ATT claims;
+//      a signal → all three declarations agree); Android targetSdk floor
+//      (declared value, or the pinned per-SDK default — an unknown SDK major
+//      fails closed); icon integrity (pure-node PNG parse: the marketing icon
+//      1024×1024 opaque, adaptive-icon layers 1024×1024, splash parses;
+//      solid-color placeholder art WARNs by default, reds when the policy
+//      escalates); and the account-deletion closure (an app shipping an auth
+//      surface must ship the deletion surface — Apple 5.1.1(v)).
 // SOURCE: docs/harness/README.md (expo-policy gate) [corpus: harness/doctrine]
 import { existsSync, readFileSync } from 'node:fs'
 import { cngPurityErrors } from './lib/cng-purity.mjs'
 import { walkFiles } from './lib/fs-walk.mjs'
 import { fail, failures, ok, runCmd, skipOrFail, stampGate } from './lib/gate.mjs'
+import { isSolidColor, readPngMeta } from './lib/png.mjs'
 import { STAMP_INPUTS } from './lib/stamp-inputs.mjs'
 
 const GATE = 'expo-policy'
@@ -409,6 +425,413 @@ function checkEasJson() {
   }
 }
 
+// ---- 11. store readiness (tools/store-policy.json — reviewed data) --------------
+const STORE_FILE = 'tools/store-policy.json'
+const PLACEHOLDER_STRING = /(TODO|TBD|FIXME|lorem|replace this|^xx+$)/i
+// Apple's closed category vocabulary for required-reason APIs — spec data, not
+// project policy, so it lives here rather than in the reviewed file.
+// SOURCE: https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api
+const PRIVACY_API_CATEGORIES = new Set([
+  'NSPrivacyAccessedAPICategoryFileTimestamp',
+  'NSPrivacyAccessedAPICategorySystemBootTime',
+  'NSPrivacyAccessedAPICategoryDiskSpace',
+  'NSPrivacyAccessedAPICategoryActiveKeyboards',
+  'NSPrivacyAccessedAPICategoryUserDefaults',
+])
+
+/** The resolved plugin names, shared by several store checks. */
+function resolvedPluginNames() {
+  return (cfg.plugins ?? [])
+    .map((p) => (Array.isArray(p) ? p[0] : p))
+    .filter((n) => typeof n === 'string')
+}
+
+// Load + shape-check the policy. Malformed fails CLOSED — the store checks can
+// never silently disarm; a missing file is a red via readJson.
+// eslint-disable-next-line sonarjs/cognitive-complexity -- ceiling is machine-enforced by scripts/complexity-ratchet.json; this directive only silences the rule, the ratchet is what stops the score growing
+function loadStorePolicy() {
+  const p = readJson(STORE_FILE)
+  if (p === null) return null
+  const badly = (what) => {
+    fail(
+      GATE,
+      `${STORE_FILE} ${what} — the store-readiness checks cannot silently disarm; fix the policy in a reviewed diff`,
+    )
+  }
+  const sdk = p.androidTargetSdk
+  if (!Number.isInteger(sdk?.floor) || sdk.floor <= 0)
+    badly('androidTargetSdk.floor must be a positive integer')
+  if (
+    sdk.expoSdkDefaults === null ||
+    typeof sdk.expoSdkDefaults !== 'object' ||
+    !Object.values(sdk.expoSdkDefaults).every((v) => Number.isInteger(v) && v > 0)
+  ) {
+    badly('androidTargetSdk.expoSdkDefaults must map SDK majors to positive integers')
+  }
+  if (typeof p.iosEncryption?.nonExemptAllowed !== 'boolean')
+    badly('iosEncryption.nonExemptAllowed must be a boolean')
+  if (
+    p.iosEncryption.nonExemptAllowed === true &&
+    (typeof p.iosEncryption.reason !== 'string' || p.iosEncryption.reason.trim() === '')
+  ) {
+    badly('iosEncryption.nonExemptAllowed: true requires a non-empty reason')
+  }
+  const keyMap = p.usageDescriptionKeysByPlugin
+  if (
+    keyMap === null ||
+    typeof keyMap !== 'object' ||
+    !Object.values(keyMap).every(
+      (v) => Array.isArray(v) && v.every((k) => typeof k === 'string' && k !== ''),
+    )
+  ) {
+    badly('usageDescriptionKeysByPlugin must map plugin names to arrays of InfoPlist keys')
+  }
+  if (
+    !Array.isArray(p.trackingSdkSignals) ||
+    !p.trackingSdkSignals.every((s) => typeof s === 'string' && s !== '')
+  ) {
+    badly('trackingSdkSignals must be an array of package names')
+  }
+  if (
+    !Array.isArray(p.privacyAccessedApiTypes) ||
+    !p.privacyAccessedApiTypes.every(
+      (row) =>
+        typeof row?.category === 'string' &&
+        Array.isArray(row.reasons) &&
+        row.reasons.length > 0 &&
+        typeof row.why === 'string' &&
+        row.why.trim() !== '',
+    )
+  ) {
+    badly('privacyAccessedApiTypes must be an array of { category, reasons (non-empty), why }')
+  }
+  const ad = p.accountDeletion
+  const adOk =
+    (ad?.surface === 'action' &&
+      typeof ad.actionId === 'string' &&
+      ad.actionId !== '' &&
+      typeof ad.serverPath === 'string' &&
+      ad.serverPath.startsWith('/')) ||
+    (ad?.surface === 'route' &&
+      typeof ad.routeId === 'string' &&
+      ad.routeId !== '' &&
+      typeof ad.serverPath === 'string') ||
+    (ad?.surface === 'external' &&
+      typeof ad.url === 'string' &&
+      ad.url.startsWith('https://') &&
+      typeof ad.reason === 'string' &&
+      ad.reason.trim() !== '') ||
+    (ad?.surface === 'none' && typeof ad.reason === 'string' && ad.reason.trim() !== '')
+  if (!adOk)
+    badly(
+      'accountDeletion must be one of { surface: "action", actionId, serverPath } | { surface: "route", routeId, serverPath } | { surface: "external", url: https, reason } | { surface: "none", reason }',
+    )
+  if (p.icons?.solidColorPlaceholder !== 'warn' && p.icons?.solidColorPlaceholder !== 'error') {
+    badly('icons.solidColorPlaceholder must be "warn" or "error"')
+  }
+  return p
+}
+
+// 11a. iOS usage-description strings: reviewed bidirectionally (the ios[] list
+// in tools/expo-permissions.json — the android allowlist's sibling), never
+// placeholder-shaped, and every plugin-implied key present. Pre-prebuild
+// honesty: the reviewed map is keyed by PLUGIN because that is the only
+// surface visible before prebuild; a bare npm dep touching a sensitive API is
+// invisible here — Apple's post-submission validation is the backstop.
+// SOURCE: https://developer.apple.com/documentation/bundleresources/information-property-list/protected-resources
+function checkUsageDescriptions(policy) {
+  const file = readJson(PERMS_FILE)
+  if (file === null) return
+  const infoPlist = cfg.ios?.infoPlist ?? {}
+  const declared = Object.keys(infoPlist).filter((k) => k.endsWith('UsageDescription'))
+  const reviewed = new Set()
+  for (const entry of file.ios ?? []) {
+    if (
+      typeof entry?.key !== 'string' ||
+      entry.key === '' ||
+      typeof entry?.reason !== 'string' ||
+      entry.reason.trim() === ''
+    ) {
+      errs.push(
+        `${PERMS_FILE}: ios[] entry ${JSON.stringify(entry)} — every usage-description key needs { key, reason } with a non-empty reviewed reason`,
+      )
+      continue
+    }
+    reviewed.add(entry.key)
+  }
+  for (const key of declared) {
+    if (!reviewed.has(key)) {
+      errs.push(
+        `ios.infoPlist.${key} declared with no reviewed entry in ${PERMS_FILE} ios[] — a purpose string is a user-facing promise; review it in`,
+      )
+    }
+    const value = infoPlist[key]
+    if (typeof value !== 'string' || value.trim().length < 10 || PLACEHOLDER_STRING.test(value)) {
+      errs.push(
+        `ios.infoPlist.${key} is ${JSON.stringify(value)} — Apple rejects empty or boilerplate purpose strings; write the real sentence a user reads in the permission sheet`,
+      )
+    }
+  }
+  for (const key of reviewed) {
+    if (!declared.includes(key)) {
+      errs.push(
+        `${PERMS_FILE} ios[] lists "${key}" but the resolved config declares no such usage string — stale entries are RED so the list mirrors reality`,
+      )
+    }
+  }
+  for (const name of resolvedPluginNames()) {
+    for (const key of policy.usageDescriptionKeysByPlugin[name] ?? []) {
+      if (infoPlist[key] === undefined) {
+        errs.push(
+          `plugin "${name}" implies ios.infoPlist.${key} but the resolved config declares none — the store build will prompt with a missing/system-default string (a rejection class); declare it in app.config.ts`,
+        )
+      }
+    }
+  }
+}
+
+// 11b. Export compliance: undeclared means App Store Connect re-asks the
+// encryption question on every build — a question no agent can answer.
+// SOURCE: https://developer.apple.com/documentation/bundleresources/information-property-list/itsappusesnonexemptencryption
+function checkExportCompliance(policy) {
+  const its = cfg.ios?.infoPlist?.ITSAppUsesNonExemptEncryption
+  if (typeof its !== 'boolean') {
+    errs.push(
+      `ios.infoPlist.ITSAppUsesNonExemptEncryption is ${JSON.stringify(its)} — export compliance must be DECLARED as a boolean (https-only apps declare false: standard TLS is exempt); undeclared re-asks the question on every TestFlight/App Store build`,
+    )
+  } else if (its === true && policy.iosEncryption.nonExemptAllowed !== true) {
+    errs.push(
+      `ios.infoPlist.ITSAppUsesNonExemptEncryption: true but ${STORE_FILE} iosEncryption.nonExemptAllowed is false — shipping non-exempt cryptography is a reviewed decision (set nonExemptAllowed with a reason, and expect export documentation at submission)`,
+    )
+  }
+}
+
+// 11c. Privacy manifests: never REQUIRED (SDK 57 packages self-declare their
+// own PrivacyInfo.xcprivacy; an empty guessed app-level block is dead config
+// documenting wrong intent) — but whatever IS declared must be well-formed and
+// in reviewed lockstep with the policy.
+// SOURCE: https://developer.apple.com/documentation/bundleresources/privacy-manifest-files
+function checkPrivacyManifests(policy) {
+  const pm = cfg.ios?.privacyManifests
+  const rows = policy.privacyAccessedApiTypes
+  if (pm === undefined) {
+    if (rows.length > 0) {
+      errs.push(
+        `${STORE_FILE} reviews ${String(rows.length)} privacyAccessedApiTypes row(s) but the resolved config declares no ios.privacyManifests — reviewed-but-undeclared; declare the block or drop the rows`,
+      )
+    } else {
+      console.log(
+        `${GATE}: NOTE — no ios.privacyManifests declared (fine: SDK packages self-declare their own; the app code touches no required-reason API directly). Before FIRST submission run the dependency sweep in docs/store/ios-privacy-manifests.md (store-metadata module) — this gate validates the shape and lockstep of whatever you declare, it cannot compute the union for you`,
+      )
+    }
+    return
+  }
+  const declared = pm?.NSPrivacyAccessedAPITypes ?? []
+  const reviewedByCategory = new Map(rows.map((row) => [row.category, row]))
+  for (const entry of declared) {
+    const category = entry?.NSPrivacyAccessedAPIType
+    const reasons = entry?.NSPrivacyAccessedAPITypeReasons
+    if (typeof category !== 'string' || !PRIVACY_API_CATEGORIES.has(category)) {
+      errs.push(
+        `ios.privacyManifests NSPrivacyAccessedAPITypes declares category ${JSON.stringify(category)} — not one of Apple's required-reason categories`,
+      )
+      continue
+    }
+    if (
+      !Array.isArray(reasons) ||
+      reasons.length === 0 ||
+      !reasons.every((r) => /^[A-Z0-9]{2,5}\.\d+$/.test(String(r)))
+    ) {
+      errs.push(
+        `ios.privacyManifests category ${category}: reasons ${JSON.stringify(reasons)} — must be a non-empty array of Apple reason codes (e.g. "C617.1")`,
+      )
+    }
+    if (!reviewedByCategory.has(category)) {
+      errs.push(
+        `ios.privacyManifests declares ${category} with no reviewed row in ${STORE_FILE} privacyAccessedApiTypes — declaring a required-reason API is a reviewed human act`,
+      )
+    }
+  }
+  const declaredCategories = new Set(declared.map((e) => e?.NSPrivacyAccessedAPIType))
+  for (const row of rows) {
+    if (!declaredCategories.has(row.category)) {
+      errs.push(
+        `${STORE_FILE} reviews privacy category "${row.category}" but the resolved config no longer declares it — stale row; remove it`,
+      )
+    }
+  }
+}
+
+// 11d. App Tracking Transparency, consistent in BOTH directions.
+// SOURCE: https://developer.apple.com/documentation/apptrackingtransparency
+function checkTracking(policy) {
+  const deps = readJson(`${APP}/package.json`)?.dependencies ?? {}
+  const plugins = resolvedPluginNames()
+  const signals = policy.trackingSdkSignals.filter(
+    (s) => plugins.includes(s) || deps[s] !== undefined,
+  )
+  const att = cfg.ios?.infoPlist?.NSUserTrackingUsageDescription
+  const pm = cfg.ios?.privacyManifests
+  if (signals.length === 0) {
+    if (att !== undefined) {
+      errs.push(
+        `ios.infoPlist.NSUserTrackingUsageDescription declared but no tracking SDK is present (${STORE_FILE} trackingSdkSignals) — an ATT string with nothing tracking is an unreviewed tracking claim and a reviewer-question magnet; remove it, or add the SDK signal in review`,
+      )
+    }
+    if (pm?.NSPrivacyTracking === true || (pm?.NSPrivacyTrackingDomains ?? []).length > 0) {
+      errs.push(
+        'ios.privacyManifests claims NSPrivacyTracking/TrackingDomains but no tracking SDK is present — the three tracking declarations must agree',
+      )
+    }
+    return
+  }
+  if (typeof att !== 'string' || att.trim().length < 10 || PLACEHOLDER_STRING.test(att)) {
+    errs.push(
+      `tracking SDK present (${signals.join(', ')}) but ios.infoPlist.NSUserTrackingUsageDescription is ${JSON.stringify(att)} — ATT requires a real purpose string before the prompt can show`,
+    )
+  }
+  if (pm?.NSPrivacyTracking !== true) {
+    errs.push(
+      `tracking SDK present (${signals.join(', ')}) but ios.privacyManifests.NSPrivacyTracking is not true — the three tracking declarations must agree`,
+    )
+  }
+}
+
+// 11e. Android targetSdk floor — declared value, else the pinned per-SDK
+// default; an unknown Expo SDK major fails CLOSED until a human pins it.
+// SOURCE: https://developer.android.com/google/play/requirements/target-sdk
+function checkTargetSdk(policy) {
+  let declared
+  const walk = (node) => {
+    if (node === null || typeof node !== 'object') return
+    for (const [k, v] of Object.entries(node)) {
+      if (k === 'targetSdkVersion' && typeof v === 'number') declared = v
+      walk(v)
+    }
+  }
+  walk(cfg)
+  const { floor, expoSdkDefaults } = policy.androidTargetSdk
+  if (declared !== undefined) {
+    if (declared < floor) {
+      errs.push(
+        `targetSdkVersion ${String(declared)} declared below the Play floor ${String(floor)} (${STORE_FILE}) — Play rejects new builds targeting stale API levels`,
+      )
+    }
+    return
+  }
+  const major = String(cfg.sdkVersion ?? '').split('.')[0]
+  const mapped = expoSdkDefaults[major]
+  if (mapped === undefined) {
+    errs.push(
+      `no targetSdkVersion declared and ${STORE_FILE} androidTargetSdk.expoSdkDefaults has no entry for Expo SDK "${major}" — pin the SDK's default targetSdk in a reviewed diff (the check fails closed on an unknown SDK)`,
+    )
+  } else if (mapped < floor) {
+    errs.push(
+      `Expo SDK ${major} defaults to targetSdk ${String(mapped)}, below the Play floor ${String(floor)} — declare a compliant targetSdkVersion via expo-build-properties, or update the reviewed mapping`,
+    )
+  }
+}
+
+// 11f. Icon integrity — pure-node PNG parse over the RESOLVED asset paths.
+// Solid-color placeholder art is a NOTE by default (the scaffold ships it
+// deliberately); the policy escalates it to red as a pre-submission step.
+// SOURCE: Apple HIG app icons — the 1024×1024 marketing icon must be opaque
+// https://developer.apple.com/design/human-interface-guidelines/app-icons#App-icon-sizes
+function checkIconIntegrity(policy) {
+  const escalate = policy.icons.solidColorPlaceholder === 'error'
+  const iconSites = []
+  if (typeof cfg.icon === 'string')
+    iconSites.push(['icon', cfg.icon, { square: 1024, opaque: true }])
+  else
+    errs.push(
+      `icon is ${JSON.stringify(cfg.icon)} — the app icon must be declared (Expo derives every store size from it)`,
+    )
+  const ios = cfg.ios?.icon
+  for (const [k, v] of typeof ios === 'string' ? [['ios.icon', ios]] : Object.entries(ios ?? {})) {
+    if (typeof v === 'string') iconSites.push([`ios.icon.${k}`, v, { square: 1024, opaque: true }])
+  }
+  const adaptive = cfg.android?.adaptiveIcon ?? {}
+  for (const key of ['foregroundImage', 'monochromeImage', 'backgroundImage']) {
+    if (typeof adaptive[key] === 'string')
+      iconSites.push([`android.adaptiveIcon.${key}`, adaptive[key], { square: 1024 }])
+  }
+  const splashImage = (cfg.plugins ?? []).find(
+    (p) => Array.isArray(p) && p[0] === 'expo-splash-screen',
+  )?.[1]?.image
+  if (typeof splashImage === 'string') iconSites.push(['expo-splash-screen image', splashImage, {}])
+  for (const [site, rel, wants] of iconSites) {
+    const path = `${APP}/${rel.replace(/^\.\//, '')}`
+    if (!existsSync(path)) {
+      errs.push(
+        `${site} names "${rel}" but ${path} does not exist — a dangling asset fails the store build long after this chain went green`,
+      )
+      continue
+    }
+    const buffer = readFileSync(path)
+    const meta = readPngMeta(buffer)
+    if (meta === null) {
+      errs.push(`${site} (${path}) is not a structurally sound PNG — store pipelines reject it`)
+      continue
+    }
+    if (
+      wants.square !== undefined &&
+      (meta.width !== wants.square || meta.height !== wants.square)
+    ) {
+      errs.push(
+        `${site} (${path}) is ${String(meta.width)}×${String(meta.height)} — must be ${String(wants.square)}×${String(wants.square)} (Expo derives every density from it)`,
+      )
+    }
+    if (wants.opaque === true && meta.hasAlpha) {
+      errs.push(
+        `${site} (${path}) carries an alpha channel — App Store Connect rejects transparency in the marketing icon; flatten it onto a background`,
+      )
+    }
+    if (isSolidColor(buffer) === true) {
+      const line = `${site} (${path}) is a solid-color placeholder — ship real art before submission (flip ${STORE_FILE} icons.solidColorPlaceholder to "error" as the pre-submission step)`
+      if (escalate) errs.push(line)
+      else console.log(`${GATE}: NOTE — ${line}`)
+    }
+  }
+}
+
+// 11g. Account-deletion closure (Apple 5.1.1(v)): an app that ships an auth
+// surface ships the deletion surface. The gate proves the surface and endpoint
+// EXIST; completeness of the deletion is the RLS suite's live sweep case.
+// SOURCE: https://developer.apple.com/app-store/review/guidelines/#5.1.1
+function checkAccountDeletion(policy) {
+  const authSurface =
+    ['tsx', 'jsx', 'ts', 'js'].some((ext) => existsSync(`${APP}/app/sign-in.${ext}`)) ||
+    existsSync(`${APP}/src/auth/providers`)
+  if (!authSurface) return
+  const ad = policy.accountDeletion
+  if (ad.surface === 'external' || ad.surface === 'none') return // reviewed escapes, shape-checked above
+  if (ad.surface === 'action') {
+    const registry = `${APP}/src/features/actions/registry.ts`
+    const text = existsSync(registry) ? readFileSync(registry, 'utf8') : ''
+    if (!text.includes(`id: '${ad.actionId}'`)) {
+      errs.push(
+        `the app ships an auth surface but ${registry} registers no '${ad.actionId}' command — Apple 5.1.1(v): account creation requires in-app account deletion (worked pattern: the shipped session.deleteAccount action + DELETE /api/me)`,
+      )
+    }
+  } else {
+    const routes = `${APP}/src/routes.ts`
+    const text = existsSync(routes) ? readFileSync(routes, 'utf8') : ''
+    if (!text.includes(`id: '${ad.routeId}'`)) {
+      errs.push(
+        `the app ships an auth surface but ${routes} registers no '${ad.routeId}' route — Apple 5.1.1(v) requires an in-app deletion surface`,
+      )
+    }
+  }
+  const spec = readJson('apps/server/openapi.json')
+  if (spec !== null && spec.paths?.[ad.serverPath]?.delete === undefined) {
+    errs.push(
+      `the deletion surface points at DELETE ${ad.serverPath} but apps/server/openapi.json declares no such operation — the surface must be backed by a real, contract-visible endpoint`,
+    )
+  }
+}
+
+const storePolicy = loadStorePolicy()
+
 checkIdentity()
 checkEngine()
 checkTransport()
@@ -418,10 +841,19 @@ scanExtraKeys(cfg.extra ?? {}, 'extra.')
 checkPublicEnvNames()
 checkSplashLockstep()
 checkEasJson()
+if (storePolicy !== null) {
+  checkUsageDescriptions(storePolicy)
+  checkExportCompliance(storePolicy)
+  checkPrivacyManifests(storePolicy)
+  checkTracking(storePolicy)
+  checkTargetSdk(storePolicy)
+  checkIconIntegrity(storePolicy)
+  checkAccountDeletion(storePolicy)
+}
 
 failures(GATE, errs)
 recordGreen()
 ok(
   GATE,
-  'identity locked, appVersion runtime, hermes + new-arch floor, transport pinned, permissions/plugins reviewed, no secret-shaped extra, splash lockstep, eas.json sane, CNG pure',
+  'identity locked, appVersion runtime, hermes + new-arch floor, transport pinned, permissions/plugins reviewed, no secret-shaped extra, splash lockstep, eas.json sane, CNG pure; store-ready floor: usage strings reviewed, export compliance declared, privacy-manifest shape + ATT consistent, targetSdk floored, icons sound, account-deletion closed',
 )

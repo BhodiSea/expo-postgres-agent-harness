@@ -41,6 +41,15 @@ export default {
       bundleIdentifier: '{{APP_IDENTIFIER}}',
       buildNumber: pkg.version,
       supportsTablet: true,
+      infoPlist: {
+        // Export compliance, DECLARED: undeclared re-asks the encryption
+        // question on every TestFlight/App Store build. False is correct for
+        // this stack — the app's only cryptography is standard TLS (exempt).
+        // Flip to true (a reviewed act: tools/store-policy.json iosEncryption)
+        // only if you ship non-exempt cryptography.
+        // SOURCE: https://developer.apple.com/documentation/bundleresources/information-property-list/itsappusesnonexemptencryption
+        ITSAppUsesNonExemptEncryption: false,
+      },
     },
     android: {
       package: '{{APP_IDENTIFIER}}',

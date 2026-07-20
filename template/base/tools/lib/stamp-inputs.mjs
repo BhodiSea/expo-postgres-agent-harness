@@ -65,6 +65,9 @@ export const STAMP_INPUTS = {
   // manifest are inputs because the gate asserts the splash background color
   // equals the GENERATED dark canvas token — a retuned palette must invalidate
   // a warm stamp or the splash check would ride a stale green.
+  // The 0.1.2 store-readiness inputs join the list: the reviewed policy, the
+  // icon assets (integrity checks parse their bytes), the actions registry +
+  // openapi contract (the account-deletion closure reads both).
   'expo-policy': [
     'apps/mobile/app.config.ts',
     'apps/mobile/package.json',
@@ -74,6 +77,10 @@ export const STAMP_INPUTS = {
     'apps/mobile/eas.json',
     'apps/mobile/src/theme/tokens.gen.ts',
     'tools/styleguide.manifest.json',
+    'tools/store-policy.json',
+    'apps/mobile/assets',
+    'apps/mobile/src/features/actions/registry.ts',
+    'apps/server/openapi.json',
     'pnpm-lock.yaml',
   ],
   // `expo install --check` version alignment + the config-plugin allowlist +

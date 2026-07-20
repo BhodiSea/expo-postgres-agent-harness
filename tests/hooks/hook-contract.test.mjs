@@ -310,6 +310,7 @@ const RULE_CANARIES = {
   // allowlist is native reach — a human decision.
   'expo-permissions': [pathDeny('tools/expo-permissions.json')],
   'expo-plugins': [pathDeny('tools/expo-plugins.json')],
+  'store-policy': [pathDeny('tools/store-policy.json')],
   'bundle-budget': [pathDeny('tools/bundle-budget.json')],
   // The gzip-ratchet baseline: agent-editing it would re-baseline the agent's
   // own regression; `pnpm perf:baseline` + a reviewed commit is the only path.

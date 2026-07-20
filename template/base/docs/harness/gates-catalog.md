@@ -120,9 +120,41 @@ the splash/adaptive-icon background hex equals the generated dark `canvas` token
 "local"`, `autoIncrement: false`). CNG purity rides along: `android/`/`ios/` stay
 untracked and ignored. Needs `apps/mobile/node_modules` — loud SKIP locally
 without it, FAIL CLOSED in CI; unchanged inputs ride a content stamp.
+
+The STORE-READINESS floor (0.1.2), driven by `tools/store-policy.json`
+(reviewed data, write-guard-protected; malformed fails CLOSED — the checks can
+never silently disarm): iOS `*UsageDescription` strings reviewed bidirectionally
+against the `ios[]` list in `tools/expo-permissions.json`, never empty or
+placeholder-shaped, and every plugin-implied key present (pre-prebuild honesty:
+the implication map is keyed by PLUGIN — a bare npm dep is invisible until
+prebuild, and Apple's post-submission validation is the backstop);
+`ITSAppUsesNonExemptEncryption` explicitly DECLARED (undeclared re-asks the
+export-compliance question on every build; `true` needs the reviewed
+`iosEncryption` escape); `ios.privacyManifests` never REQUIRED (SDK packages
+self-declare their own — absence gets a NOTE pointing at the store-metadata
+sweep) but whatever is declared must use Apple's category vocabulary, real
+reason codes, and the reviewed `privacyAccessedApiTypes` lockstep (both
+directions red); App Tracking Transparency consistent BOTH ways (no tracking
+SDK → an ATT string or `NSPrivacyTracking` claim reds; an SDK signal → all
+three declarations must agree); Android targetSdk floored (declared value, or
+the pinned per-Expo-SDK default — an unknown SDK major fails closed); icon
+integrity via a zero-dependency PNG parse (`tools/lib/png.mjs`: marketing icon
+1024×1024 and opaque, adaptive-icon layers 1024×1024, splash parses;
+solid-color placeholder art NOTEs by default and reds when
+`icons.solidColorPlaceholder` escalates to `"error"` — the pre-submission
+step); and the ACCOUNT-DELETION closure (Apple 5.1.1(v)): an app shipping an
+auth surface must register the deletion action (or route) AND back it with the
+contract-visible `DELETE` operation — the shipped `session.deleteAccount` +
+`DELETE /api/me` slice is the worked pattern, and the deletion's completeness
+is the RLS suite's live sweep case, not this static check. The device lane
+closes the targetSdk half against the GENERATED gradle project after prebuild.
 **Anti-vacuity:** add a permission to app.config.ts without a reviewed
 `tools/expo-permissions.json` entry (editor — the write guard also watches this
-surface) → FAIL naming it; change the splash hex one nibble → FAIL the lockstep.
+surface) → FAIL naming it; change the splash hex one nibble → FAIL the
+lockstep; delete `ITSAppUsesNonExemptEncryption` → FAIL naming the declaration;
+declare a usage string as "TODO" → FAIL; empty the deletion registry entry
+while sign-in ships → FAIL citing 5.1.1(v); swap the marketing icon for a
+512×512 or alpha-carrying PNG → FAIL with the measured dimensions.
 
 ### 7. native-deps — `node tools/check-native-deps.mjs`
 

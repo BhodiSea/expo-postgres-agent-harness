@@ -15,6 +15,7 @@ import { tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { deflateSync } from 'node:zlib'
 
 const GATE = fileURLToPath(
   new URL('../../template/base/tools/check-expo-policy.mjs', import.meta.url),
@@ -29,6 +30,10 @@ const SHIPPED_PLUGINS = readFileSync(
 )
 const SHIPPED_EAS = readFileSync(
   fileURLToPath(new URL('../../template/stack/apps/mobile/eas.json', import.meta.url)),
+  'utf8',
+)
+const SHIPPED_STORE_POLICY = readFileSync(
+  fileURLToPath(new URL('../../template/base/tools/store-policy.json', import.meta.url)),
   'utf8',
 )
 const SHIPPED_TOKENS = readFileSync(
@@ -53,6 +58,41 @@ const LOCK = {
   easProjectId: 'ab12cd34-0000-4000-8000-1234567890ab',
 }
 
+// Minimal REAL PNGs for the icon-integrity checks (fake CRCs — the gate's
+// zero-dependency parser reads IHDR/IDAT and skips CRC validation). All-zero
+// pixels = deliberately SOLID (the scaffold's placeholder posture; the policy
+// default warns); `vary` flips one pixel for the not-solid cases.
+function makePng(width, height, { alpha = false, vary = false } = {}) {
+  const bpp = alpha ? 4 : 3
+  const stride = width * bpp
+  const raw = Buffer.alloc((stride + 1) * height)
+  if (vary) raw[1 + bpp] = 0xff // second pixel's first channel differs
+  const ihdr = Buffer.alloc(13)
+  ihdr.writeUInt32BE(width, 0)
+  ihdr.writeUInt32BE(height, 4)
+  ihdr[8] = 8
+  ihdr[9] = alpha ? 6 : 2
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4)
+    len.writeUInt32BE(data.length, 0)
+    return Buffer.concat([len, Buffer.from(type, 'latin1'), data, Buffer.alloc(4)])
+  }
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', deflateSync(raw)),
+    chunk('IEND', Buffer.alloc(0)),
+  ])
+}
+
+function defaultAssets() {
+  return {
+    'apps/mobile/assets/icon.png': makePng(1024, 1024),
+    'apps/mobile/assets/adaptive-icon.png': makePng(1024, 1024, { alpha: true }),
+    'apps/mobile/assets/splash-icon.png': makePng(512, 512, { alpha: true }),
+  }
+}
+
 // A resolved config that satisfies every rule against the fixture lock + the
 // shipped allowlists (loopback ATS exceptions included, to pin their legality).
 function baseConfig() {
@@ -61,11 +101,14 @@ function baseConfig() {
     slug: 'example',
     scheme: LOCK.scheme,
     version: '0.1.0',
+    sdkVersion: '57.0.0',
     newArchEnabled: true,
+    icon: './assets/icon.png',
     ios: {
       bundleIdentifier: LOCK.appIdentifier,
       buildNumber: '0.1.0',
       infoPlist: {
+        ITSAppUsesNonExemptEncryption: false,
         NSAppTransportSecurity: {
           NSExceptionDomains: { localhost: {}, '127.0.0.1': {} },
         },
@@ -135,7 +178,7 @@ function git(dir, ...args) {
 
 const asText = (v) => (typeof v === 'string' ? v : JSON.stringify(v, null, 2))
 
-/** @param {{ config?: any, banner?: string, lock?: any, perms?: any, pluginsFile?: any, eas?: any, tokens?: any, nodeModules?: boolean, sources?: Record<string, string>, gitignore?: string }} [opts] */
+/** @param {{ config?: any, banner?: string, lock?: any, perms?: any, pluginsFile?: any, eas?: any, tokens?: any, storePolicy?: any, assets?: Record<string, Buffer> | null, nodeModules?: boolean, sources?: Record<string, string | Buffer>, gitignore?: string }} [opts] */
 function fixture({
   config = baseConfig(),
   banner = 'Scope: all 5 workspace projects',
@@ -144,6 +187,8 @@ function fixture({
   pluginsFile = SHIPPED_PLUGINS,
   eas = SHIPPED_EAS,
   tokens = SHIPPED_TOKENS,
+  storePolicy = SHIPPED_STORE_POLICY,
+  assets = defaultAssets(),
   nodeModules = true,
   sources = {},
   gitignore = 'node_modules/\napps/mobile/android/\napps/mobile/ios/\n',
@@ -155,6 +200,8 @@ function fixture({
     join(dir, 'apps/mobile/app.config.ts'),
     '// resolved by the fake expo CLI in this fixture\nexport default {}\n',
   )
+  // The tracking check reads the app package's dependency map.
+  writeFileSync(join(dir, 'apps/mobile/package.json'), '{ "name": "mobile", "dependencies": {} }\n')
   if (nodeModules) {
     mkdirSync(join(dir, 'apps/mobile/node_modules/.bin'), { recursive: true })
     writeFileSync(join(dir, 'apps/mobile/node_modules/.bin/expo'), '')
@@ -164,6 +211,12 @@ function fixture({
   if (pluginsFile !== null) writeFileSync(join(dir, 'tools/expo-plugins.json'), asText(pluginsFile))
   if (eas !== null) writeFileSync(join(dir, 'apps/mobile/eas.json'), asText(eas))
   if (tokens !== null) writeFileSync(join(dir, 'apps/mobile/src/theme/tokens.gen.ts'), asText(tokens))
+  if (storePolicy !== null) writeFileSync(join(dir, 'tools/store-policy.json'), asText(storePolicy))
+  for (const [rel, content] of Object.entries(assets ?? {})) {
+    const abs = join(dir, rel)
+    mkdirSync(dirname(abs), { recursive: true })
+    writeFileSync(abs, content)
+  }
   writeFileSync(join(dir, '.gitignore'), gitignore)
   for (const [rel, content] of Object.entries(sources)) {
     const abs = join(dir, rel)
@@ -173,6 +226,12 @@ function fixture({
   git(dir, 'init', '-q')
   writeShims(dir, { config, banner })
   return dir
+}
+
+function storePolicyWith(mutate) {
+  const p = JSON.parse(SHIPPED_STORE_POLICY)
+  mutate(p)
+  return p
 }
 
 function runGate(dir, { ci = true } = {}) {
@@ -547,4 +606,295 @@ test('skip asymmetry: apps/mobile/node_modules missing → loud local SKIP, CI f
   const ci = runGate(dir, { ci: true })
   assert.equal(ci.code, 1, ci.out)
   assert.ok(ci.out.includes('skips are not allowed in CI'), ci.out)
+})
+
+// ---- 11. store readiness (0.1.2, tools/store-policy.json) -----------------------
+
+const REGISTRY_WITH_DELETE = `export const ACTION_COMMANDS = [
+  { id: 'session.deleteAccount', titleKey: 'command.deleteAccount', group: 'session' },
+]
+`
+const OPENAPI_WITH_DELETE = { openapi: '3.1.0', paths: { '/api/me': { delete: { responses: {} } } } }
+const AUTH_SOURCES = {
+  'apps/mobile/app/sign-in.tsx': 'export default function SignIn() { return null }\n',
+  'apps/mobile/src/features/actions/registry.ts': REGISTRY_WITH_DELETE,
+  'apps/server/openapi.json': JSON.stringify(OPENAPI_WITH_DELETE),
+}
+
+test('GREEN store floor: the base fixture passes with the placeholder-icon NOTE (warn posture)', () => {
+  const r = runGate(fixture())
+  assert.equal(r.code, 0, r.out)
+  assert.ok(r.out.includes('store-ready floor'), r.out)
+  assert.ok(r.out.includes('solid-color placeholder'), r.out)
+  assert.ok(r.out.includes('NOTE'), r.out)
+})
+
+test('RED 11b: export compliance must be DECLARED; true without the reviewed escape reds', () => {
+  const undeclared = runGate(
+    fixture({
+      config: configWith((c) => {
+        delete c.ios.infoPlist.ITSAppUsesNonExemptEncryption
+      }),
+    }),
+  )
+  assert.equal(undeclared.code, 1, undeclared.out)
+  assert.ok(undeclared.out.includes('export compliance must be DECLARED'), undeclared.out)
+
+  const unreviewed = runGate(
+    fixture({
+      config: configWith((c) => {
+        c.ios.infoPlist.ITSAppUsesNonExemptEncryption = true
+      }),
+    }),
+  )
+  assert.equal(unreviewed.code, 1, unreviewed.out)
+  assert.ok(unreviewed.out.includes('nonExemptAllowed is false'), unreviewed.out)
+})
+
+test('11a usage strings: unreviewed + placeholder red; reviewed real string greens; stale entry reds', () => {
+  const red = runGate(
+    fixture({
+      config: configWith((c) => {
+        c.ios.infoPlist.NSCameraUsageDescription = 'TODO: fill this in'
+      }),
+    }),
+  )
+  assert.equal(red.code, 1, red.out)
+  assert.ok(red.out.includes('NSCameraUsageDescription declared with no reviewed entry'), red.out)
+  assert.ok(red.out.includes('boilerplate purpose strings'), red.out)
+
+  const reviewedPerms = JSON.parse(SHIPPED_PERMS)
+  reviewedPerms.ios = [{ key: 'NSCameraUsageDescription', reason: 'document scanning' }]
+  const green = runGate(
+    fixture({
+      config: configWith((c) => {
+        c.ios.infoPlist.NSCameraUsageDescription =
+          'Scans your paper notes into the app using the camera.'
+      }),
+      perms: reviewedPerms,
+    }),
+  )
+  assert.equal(green.code, 0, green.out)
+
+  const stale = runGate(fixture({ perms: reviewedPerms }))
+  assert.equal(stale.code, 1, stale.out)
+  assert.ok(stale.out.includes('declares no such usage string'), stale.out)
+})
+
+test('RED 11a: a plugin-implied usage key missing from the config reds naming the plugin', () => {
+  const pluginsAllow = JSON.parse(SHIPPED_PLUGINS)
+  pluginsAllow.plugins.push({ name: 'expo-camera', reason: 'test fixture' })
+  const r = runGate(
+    fixture({
+      config: configWith((c) => {
+        c.plugins.push('expo-camera')
+      }),
+      pluginsFile: pluginsAllow,
+    }),
+  )
+  assert.equal(r.code, 1, r.out)
+  assert.ok(r.out.includes('plugin "expo-camera" implies ios.infoPlist.NSCameraUsageDescription'), r.out)
+})
+
+test('11c privacy manifests: malformed category and unreviewed declaration red; reviewed lockstep greens', () => {
+  const malformed = runGate(
+    fixture({
+      config: configWith((c) => {
+        c.ios.privacyManifests = {
+          NSPrivacyAccessedAPITypes: [{ NSPrivacyAccessedAPIType: 'NSPrivacyMadeUp', NSPrivacyAccessedAPITypeReasons: ['C617.1'] }],
+        }
+      }),
+    }),
+  )
+  assert.equal(malformed.code, 1, malformed.out)
+  assert.ok(malformed.out.includes('not one of Apple'), malformed.out)
+
+  const unreviewed = runGate(
+    fixture({
+      config: configWith((c) => {
+        c.ios.privacyManifests = {
+          NSPrivacyAccessedAPITypes: [
+            { NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryUserDefaults', NSPrivacyAccessedAPITypeReasons: ['CA92.1'] },
+          ],
+        }
+      }),
+    }),
+  )
+  assert.equal(unreviewed.code, 1, unreviewed.out)
+  assert.ok(unreviewed.out.includes('no reviewed row'), unreviewed.out)
+
+  const reviewed = storePolicyWith((p) => {
+    p.privacyAccessedApiTypes = [
+      { category: 'NSPrivacyAccessedAPICategoryUserDefaults', reasons: ['CA92.1'], why: 'kv seam persists preferences' },
+    ]
+  })
+  const green = runGate(
+    fixture({
+      config: configWith((c) => {
+        c.ios.privacyManifests = {
+          NSPrivacyAccessedAPITypes: [
+            { NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryUserDefaults', NSPrivacyAccessedAPITypeReasons: ['CA92.1'] },
+          ],
+        }
+      }),
+      storePolicy: reviewed,
+    }),
+  )
+  assert.equal(green.code, 0, green.out)
+
+  const staleRow = runGate(fixture({ storePolicy: reviewed }))
+  assert.equal(staleRow.code, 1, staleRow.out)
+  assert.ok(staleRow.out.includes('no ios.privacyManifests'), staleRow.out)
+})
+
+test('11d ATT: an ATT string with no tracking SDK reds; with the SDK all three declarations must agree', () => {
+  const claim = runGate(
+    fixture({
+      config: configWith((c) => {
+        c.ios.infoPlist.NSUserTrackingUsageDescription = 'We would like to track you.'
+      }),
+    }),
+  )
+  assert.equal(claim.code, 1, claim.out)
+  assert.ok(claim.out.includes('no tracking SDK is present'), claim.out)
+
+  const pluginsAllow = JSON.parse(SHIPPED_PLUGINS)
+  pluginsAllow.plugins.push({ name: 'expo-tracking-transparency', reason: 'test fixture' })
+  const reviewedPerms = JSON.parse(SHIPPED_PERMS)
+  reviewedPerms.ios = [{ key: 'NSUserTrackingUsageDescription', reason: 'ads attribution' }]
+  const disagree = runGate(
+    fixture({
+      config: configWith((c) => {
+        c.plugins.push('expo-tracking-transparency')
+        c.ios.infoPlist.NSUserTrackingUsageDescription =
+          'Used to attribute installs to ad campaigns.'
+      }),
+      pluginsFile: pluginsAllow,
+      perms: reviewedPerms,
+    }),
+  )
+  assert.equal(disagree.code, 1, disagree.out)
+  assert.ok(disagree.out.includes('NSPrivacyTracking is not true'), disagree.out)
+})
+
+test('11e targetSdk: a declared value below the floor reds; an unknown Expo SDK major fails CLOSED', () => {
+  const low = runGate(
+    fixture({
+      config: configWith((c) => {
+        c.android.targetSdkVersion = 30
+      }),
+    }),
+  )
+  assert.equal(low.code, 1, low.out)
+  assert.ok(low.out.includes('below the Play floor'), low.out)
+
+  const unknown = runGate(
+    fixture({
+      config: configWith((c) => {
+        c.sdkVersion = '99.0.0'
+      }),
+    }),
+  )
+  assert.equal(unknown.code, 1, unknown.out)
+  assert.ok(unknown.out.includes('no entry for Expo SDK "99"'), unknown.out)
+})
+
+test('11f icons: wrong dimensions, alpha in the marketing icon, and a dangling asset each red', () => {
+  const small = runGate(
+    fixture({ assets: { ...defaultAssets(), 'apps/mobile/assets/icon.png': makePng(512, 512) } }),
+  )
+  assert.equal(small.code, 1, small.out)
+  assert.ok(small.out.includes('512×512 — must be 1024×1024'), small.out)
+
+  const alpha = runGate(
+    fixture({
+      assets: { ...defaultAssets(), 'apps/mobile/assets/icon.png': makePng(1024, 1024, { alpha: true }) },
+    }),
+  )
+  assert.equal(alpha.code, 1, alpha.out)
+  assert.ok(alpha.out.includes('carries an alpha channel'), alpha.out)
+
+  const missing = runGate(
+    fixture({
+      assets: (() => {
+        const a = defaultAssets()
+        delete a['apps/mobile/assets/icon.png']
+        return a
+      })(),
+    }),
+  )
+  assert.equal(missing.code, 1, missing.out)
+  assert.ok(missing.out.includes('does not exist'), missing.out)
+})
+
+test('11f icons: the solid-placeholder posture escalates from NOTE to red via the policy', () => {
+  const escalated = runGate(
+    fixture({ storePolicy: storePolicyWith((p) => (p.icons.solidColorPlaceholder = 'error')) }),
+  )
+  assert.equal(escalated.code, 1, escalated.out)
+  assert.ok(escalated.out.includes('solid-color placeholder'), escalated.out)
+
+  // Real (non-solid) art passes even under the escalated posture.
+  const realArt = runGate(
+    fixture({
+      storePolicy: storePolicyWith((p) => (p.icons.solidColorPlaceholder = 'error')),
+      assets: {
+        'apps/mobile/assets/icon.png': makePng(1024, 1024, { vary: true }),
+        'apps/mobile/assets/adaptive-icon.png': makePng(1024, 1024, { alpha: true, vary: true }),
+        'apps/mobile/assets/splash-icon.png': makePng(512, 512, { alpha: true, vary: true }),
+      },
+    }),
+  )
+  assert.equal(realArt.code, 0, realArt.out)
+})
+
+test('11g account deletion: an auth surface without the registered action or the openapi DELETE reds', () => {
+  const noAction = runGate(
+    fixture({
+      sources: {
+        ...AUTH_SOURCES,
+        'apps/mobile/src/features/actions/registry.ts': 'export const ACTION_COMMANDS = []\n',
+      },
+    }),
+  )
+  assert.equal(noAction.code, 1, noAction.out)
+  assert.ok(noAction.out.includes("registers no 'session.deleteAccount' command"), noAction.out)
+  assert.ok(noAction.out.includes('5.1.1(v)'), noAction.out)
+
+  const noEndpoint = runGate(
+    fixture({
+      sources: { ...AUTH_SOURCES, 'apps/server/openapi.json': JSON.stringify({ paths: {} }) },
+    }),
+  )
+  assert.equal(noEndpoint.code, 1, noEndpoint.out)
+  assert.ok(noEndpoint.out.includes('declares no such operation'), noEndpoint.out)
+
+  const closed = runGate(fixture({ sources: AUTH_SOURCES }))
+  assert.equal(closed.code, 0, closed.out)
+
+  // The reviewed 'none' escape self-disables the closure with its reason on file.
+  const escaped = runGate(
+    fixture({
+      sources: {
+        ...AUTH_SOURCES,
+        'apps/mobile/src/features/actions/registry.ts': 'export const ACTION_COMMANDS = []\n',
+      },
+      storePolicy: storePolicyWith((p) => {
+        p.accountDeletion = { surface: 'none', reason: 'SSO-only enterprise app; accounts are organization-managed' }
+      }),
+    }),
+  )
+  assert.equal(escaped.code, 0, escaped.out)
+})
+
+test('RED store policy: a malformed policy FAILS CLOSED; a missing one is a restore-it red', () => {
+  const malformed = runGate(
+    fixture({ storePolicy: storePolicyWith((p) => (p.androidTargetSdk.floor = 'thirty-five')) }),
+  )
+  assert.equal(malformed.code, 1, malformed.out)
+  assert.ok(malformed.out.includes('cannot silently disarm'), malformed.out)
+
+  const missing = runGate(fixture({ storePolicy: null }))
+  assert.equal(missing.code, 1, missing.out)
+  assert.ok(missing.out.includes('tools/store-policy.json missing'), missing.out)
 })

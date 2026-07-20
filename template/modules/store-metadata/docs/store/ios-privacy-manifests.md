@@ -84,7 +84,14 @@ use, with the reason codes the owning library documents.
 
 - **No gate automates this union.** The sweep needs the resolved pod set (a
   macOS `pod install`), which the credential-free validate chain deliberately
-  never runs. This checklist plus review discipline IS the mechanism.
+  never runs. This checklist plus review discipline IS the mechanism. What the
+  base chain DOES automate (0.1.2, expo-policy gate): the SHAPE and reviewed
+  lockstep of whatever you declare — `ios.privacyManifests` entries must use
+  Apple's category vocabulary with real reason codes and a matching reviewed
+  row in `tools/store-policy.json` `privacyAccessedApiTypes` (declared-but-
+  unreviewed and reviewed-but-undeclared both red), and the tracking
+  declarations must agree with the ATT string and the dependency set. The gate
+  still cannot compute the union for you; the sweep remains manual.
 - **The backstop is post-submission:** Apple notifies developers after a build
   is submitted with missing privacy-manifest reasons. Treat that email as a red
   gate — fix the app-level entries and resubmit.

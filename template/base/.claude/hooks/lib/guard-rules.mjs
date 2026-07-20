@@ -247,6 +247,10 @@ export const WRITE_PROTECTED = [
   // widening a permission or config-plugin allowlist is native reach — a human decision.
   { id: 'expo-permissions', re: /^tools\/expo-permissions\.json$/ },
   { id: 'expo-plugins', re: /^tools\/expo-plugins\.json$/ },
+  // Store-readiness policy (0.1.2): targetSdk floors, export-compliance stance,
+  // tracking signals, privacy-manifest lockstep, the account-deletion closure —
+  // every value is a store-review posture, so widening it is a human decision.
+  { id: 'store-policy', re: /^tools\/store-policy\.json$/ },
   { id: 'bundle-budget', re: /^tools\/bundle-budget\.json$/ },
   // The committed gzip-ratchet baseline: regenerated ONLY by `pnpm perf:baseline`
   // in a reviewed commit — an agent editing it would re-baseline its own regression.
