@@ -65,6 +65,8 @@ Before you finish (provenance is REQUIRED — the turn is not done without it):
   `tools/identity.lock.json` / the permission or plugin allowlists / `src/host/**` /
   the auth session changed;
 - run the `accessibility-reviewer` if mobile UI changed;
+- run the `design-reviewer` if mobile UI changed (taste + choreography; require
+  `PASS`);
 - emit and verify the ADR — run `/adr $1` FIRST (so the ADR Sources list is itself
   verified), THEN run `/verify-citations` and require `CITATIONS: CLEAN`.
 

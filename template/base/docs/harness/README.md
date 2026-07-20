@@ -20,7 +20,7 @@ Every mechanism belongs to one of six layers:
 | 2 | **Generation** | plan-mode design first; data structures before code (the quality bar in AGENTS.md) |
 | 3 | **In-loop verification** | mid-turn MCP tools (`corpus_search`, `rls_verify`), `posttool-fast-check.mjs` per-edit feedback |
 | 4 | **Provenance capture** | `// SOURCE:` + `[corpus: <id>]` comments, `posttool-source-check.mjs`, `tools/check-sources.mjs`, one ADR per slice (`/adr`) |
-| 5 | **Adversarial review** | read-only reviewer subagents (`security-reviewer`, `mobile-security-reviewer`, `torvalds-reviewer`, `accessibility-reviewer`, `citation-verifier` via `/verify-citations`) |
+| 5 | **Adversarial review** | read-only reviewer subagents (`security-reviewer`, `mobile-security-reviewer`, `torvalds-reviewer`, `accessibility-reviewer`, `design-reviewer`, `citation-verifier` via `/verify-citations`) |
 | 6 | **Gated completion** | the Stop hook (`stop-validate-gate.mjs`) running the full validate chain with exit-2 semantics; CI as the floor |
 
 Layers 1–2 raise the probability of correct output; layers 3–6 make incorrect output
@@ -280,6 +280,10 @@ and reds a reviewer holding anything outside the read-only allowlist or missing
   cases, delete code) before a slice is declared done.
 - `accessibility-reviewer` — RN accessibility review (roles/labels/hints, touch
   targets, screen-reader sanity) on UI-heavy slices.
+- `design-reviewer` — design-quality review (typography roles, spacing rhythm,
+  accent discipline, motion tokens, state choreography — the
+  `designing-mobile-ui` doctrine) on UI-touching slices; taste and
+  choreography, where the gates cannot judge.
 - `citation-verifier` — the provenance verifier, via `/verify-citations`.
 
 Author agents (`dal-author`, `migration-rls-author`, `test-author`) keep their write

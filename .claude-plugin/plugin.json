@@ -9,6 +9,7 @@
     "./template/base/.claude/agents/accessibility-reviewer.md",
     "./template/base/.claude/agents/citation-verifier.md",
     "./template/base/.claude/agents/dal-author.md",
+    "./template/base/.claude/agents/design-reviewer.md",
     "./template/base/.claude/agents/migration-rls-author.md",
     "./template/base/.claude/agents/mobile-security-reviewer.md",
     "./template/base/.claude/agents/security-reviewer.md",
