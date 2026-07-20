@@ -4,6 +4,111 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] — 2026-07-20
+
+The four-pillar wave (W10): the reference app gains a design system with
+depth — motion, elevation, iconography, haptics, skeletons — the styleguide
+gate learns to enforce it, expo-policy learns today's store-rejection surface,
+the perf floor grows update-cost and per-image budgets, and positive design
+doctrine ships as guidance surfaces (a skill and a sixth reviewer). Honest
+limit up front: the guidance half is advisory by design — the deterministic
+floor changes are exactly the gate/check items below, each with its can-fail
+proof, and the full chain plus every Stop-chain suite (live RLS included) runs
+green on a fresh scaffold with zero edits. Counts: the chain stays 21 gates
+and the canary registry 30 steps (existing proofs extended in place); guard
+rules grow 72 → 73 (`tools/store-policy.json` write-protection, canaried).
+
+### Added
+
+- **Design-token depth** (`tools/styleguide.manifest.json`, all four families
+  optional and content-conditional — an older seeded manifest renders
+  byte-identically, a malformed family fails the generator): `motion`
+  (durations/easings/pressScale), `elevation` (spreadable shadow levels),
+  `sizing` (the 44dp `minTarget` + the icon scale), `fontScaleCap`
+  (maxFontSizeMultiplier caps). Proven by shipped-manifest block presence, a
+  legacy-shape backward-compat render, and a RED case per family.
+- **The motion seam** (`src/lib/motion.ts` — the api-client one-door pattern,
+  for animation): `useEntrance`/`usePulse`/`usePressScale` animate
+  transform/opacity only (native-driver) over the motion tokens and collapse
+  to static under OS reduce-motion by construction. New primitives: `Skeleton`
+  (announced progressbar mirroring the incoming layout), `Spinner`, `Card`
+  (tone + elevation), `PressableScale` (spring scale + opacity + the 44dp
+  floor + optional haptic — Button and OptionRow refactor onto it), and the
+  closed glyph set behind `Icon` (react-native-svg 15.15.4, one-door'd; tab
+  bar, toast tones, and OptionRow chevrons gain glyphs). expo-haptics ~57.0.1
+  joins the catalog behind `src/lib/haptics.ts` (selection/success/warning
+  vocabulary only). Pull-to-refresh on both lists; keyboard avoidance moves to
+  the Screen primitive; matrix rows move to 44dp (un-clipping font_scale 1.3).
+- **Styleguide design-depth sub-checks** (each keyed on manifest data, keyless
+  self-disables with ONE combined adoption NOTE, malformed/stale fail closed):
+  literal `duration:`/`delay:` values red; raw
+  `Animated`/`LayoutAnimation`/`Easing` references red outside the seam + the
+  components home with NO allow escape; `shadow*`/`elevation` keys are spelled
+  only in the generated tokens module; a home file styling a raw control must
+  reference `sizes.minTarget`; `controlPrimitives.base` confines the
+  pressable-class tags to the one touchable base. Ten new can-fail proofs; the
+  e2e states sweep now asserts every route's loading surface is a progressbar
+  (prose loading reds).
+- **The store-readiness floor** in expo-policy, driven by the reviewed
+  `tools/store-policy.json` (guard rule 73; malformed fails closed): iOS
+  usage-description strings reviewed bidirectionally (`ios[]` in
+  `tools/expo-permissions.json`) and never placeholder-shaped, with
+  plugin-implied keys required; `ITSAppUsesNonExemptEncryption` explicitly
+  declared (the scaffold declares `false`); `ios.privacyManifests` validated
+  in shape + reviewed lockstep when declared (never required — absence NOTEs
+  toward the store-metadata sweep); App Tracking Transparency consistent in
+  both directions; the Android targetSdk floor (declared or the pinned
+  per-Expo-SDK default, unknown majors fail closed, the device lane re-checks
+  the generated gradle project); icon integrity via the zero-dependency
+  `tools/lib/png.mjs` (marketing icon 1024×1024 opaque; solid-color
+  placeholder art NOTEs by default, reds when the policy escalates — the
+  pre-submission step); and the account-deletion closure (Apple 5.1.1(v)).
+  Twelve new red/green fixture pairs.
+- **The account-deletion slice** — store compliance as a worked vertical
+  slice: `DELETE /api/me` (Bearer, 204, idempotent) →
+  `accountDal.deleteAllOwnedData` (ONE unqualified DELETE under FORCE RLS —
+  the policy qual is the filter; statement shape pinned via the capturing
+  pg-proxy, the plan probe EXPLAINs the new shape at 25k rows with no Seq
+  Scan), the command palette's `session.deleteAccount` behind a native
+  destructive confirm (server first, then sign-out; failures keep the
+  session), `apiDelete` in the one-door api-client, and the LIVE cross-tenant
+  sweep proof (A's unqualified DELETE removes only A — B survives). ADR
+  20260720 records the slice; app-review-notes names the path for reviewers.
+- **Perf-floor growth**: the perf-budget gate measures the UPDATE phase (the
+  same mounted tree re-rendered with a changed `tick` — a `React.memo` wrapper
+  cannot fake it; asserted only when `medianUpdateBudgetMs` is declared,
+  seeded ~10× the fresh-scaffold median); the build gate budgets images by
+  magic bytes and raw size (`largestImageKb`, `maxImageCount`,
+  `pngOverKbPreferWebp`); the startup lane rolls median-of-3 cold starts plus
+  a warm start per route (`maxWarmTotalTimeMs`, the declared-but-unreported
+  red), and records honestly that `reportFullyDrawn()` has no managed binding
+  — the median + warm split is the managed replacement.
+- **Guidance surfaces**: the `designing-mobile-ui` skill (an operational
+  procedure over four references — foundations, motion, state choreography,
+  six per-surface checklists, each bottoming out in existing gates; prose
+  only, no scripts) and the `design-reviewer` — the sixth read-only reviewer
+  (taste + choreography; read-only machine-asserted by docs-sync and
+  check-plugin-manifest, `6/6 reviewers read-only`). AGENTS.md gains the
+  compact design bar and a store-readiness invariant; the vertical-slice
+  recipe cross-references the design skill and requires its PASS.
+
+### Changed
+
+- `developer.apple.com` joins the citation-domain allowlist (HIG hit targets,
+  App Review Guidelines, Info.plist keys — the store checks cite it inline).
+- `design/PORT-SPEC.md` locks the motion decision (core `Animated` + manifest
+  motion tokens through one seam) and adds react-native-reanimated to
+  Considered-and-rejected; the gates catalog records why `pnpm audit` stays
+  out of the chain (the diff-aware `osv-scan` PR lane is the deterministic
+  form — now documented under CI-only lanes) and reaffirms the no-memory-
+  budget stance.
+- Truth-ups the wave surfaced: `osv-scan.yml` sheds its cross-port
+  second-ecosystem wording (this lineage is npm-only); the approved-tools
+  registry now lists BOTH shipped skills (the vertical-slice skill had been
+  missing from its own default-deny registry); the store-metadata
+  privacy-manifest doc states what the base gate now automates (shape +
+  lockstep) and what remains manual (the union sweep).
+
 ## [0.1.1] — 2026-07-19
 
 Patch release: the repository is now a GitHub template repository, and the
