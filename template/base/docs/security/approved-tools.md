@@ -24,6 +24,8 @@ steered by prompt injection — a regulated operator must vet them, not trust th
 |---|---|---|---|---|
 | `corpus_search` | MCP (local stdio) | `tools/mcp/corpus-search-server.mjs` @ this repo | self-authored | citation grounding; no network, reads only the local pinned corpus (`tools/mcp/corpus/index.json`) |
 | `rls_verify` | MCP (local stdio) | `tools/mcp/rls-verify-server.mjs` @ this repo | self-authored | mid-turn cross-user RLS probe; connects only to the local `DATABASE_URL` as the unprivileged `app_api` role; read-only, always rolled back |
+| `authoring-vertical-slice` | Skill | `.claude/skills/authoring-vertical-slice/` @ this repo | self-authored | the slice recipe (migration → RLS → DAL → route → screen → tests); bundled scripts reviewed with the harness itself |
+| `designing-mobile-ui` | Skill | `.claude/skills/designing-mobile-ui/` @ this repo | self-authored | the design doctrine (typography/spacing/motion/state choreography + per-surface checklists); prose only — ships NO scripts by design |
 
 Anything not listed here does not run. Record scan results + pinned versions as evidence
 for security reviews. Both shipped servers are wired in `.mcp.json` and allow-listed in

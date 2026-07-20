@@ -1,7 +1,7 @@
 {
   "name": "expo-postgres-agent-harness",
   "metadata": {
-    "description": "Agent-side companion to the expo-postgres-agent-harness: subagents, commands, and the vertical-slice skill for Expo (React Native) + Hono + Postgres FORCE-RLS monorepos shipped to the app stores via EAS."
+    "description": "Agent-side companion to the expo-postgres-agent-harness: subagents, commands, and the vertical-slice + mobile-UI-design skills for Expo (React Native) + Hono + Postgres FORCE-RLS monorepos shipped to the app stores via EAS."
   },
   "owner": {
     "name": "BhodiSea"
@@ -10,7 +10,7 @@
     {
       "name": "expo-postgres-agent-harness",
       "source": ".",
-      "description": "Agent half of the harness: migration/RLS, DAL, and test authors; security, Torvalds-grade, accessibility, and mobile-security reviewers; citation verifier; /adr, /new-feature, /verify-citations; the vertical-slice skill."
+      "description": "Agent half of the harness: migration/RLS, DAL, and test authors; security, Torvalds-grade, accessibility, and mobile-security reviewers; citation verifier; /adr, /new-feature, /verify-citations; the vertical-slice and mobile-UI-design skills."
     }
   ]
 }
