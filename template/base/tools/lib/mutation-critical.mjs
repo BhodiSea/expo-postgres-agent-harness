@@ -67,6 +67,13 @@ const CRITICAL_EXCLUDES = [
   'apps/mobile/src/lib/api-client.ts',
   'apps/mobile/src/lib/boot-timing.ts',
   'apps/mobile/src/lib/log.ts',
+  // RN-coupled (jest-expo lane), 0.1.2: the motion seam (react-native Animated/
+  // AccessibilityInfo closure) and the haptics seam (expo-haptics closure).
+  // Behavioural nets: __tests__/motion-primitives.test.tsx + the primitives
+  // suite's reduce-motion/teardown cases; src/lib/haptics.test.ts (the engine
+  // mapping) + the primitives suite's vocabulary-wiring cases.
+  'apps/mobile/src/lib/motion.ts',
+  'apps/mobile/src/lib/haptics.ts',
   // React-hooks module (useEffect/rAF), jest-expo lane — and dev-only perf
   // tooling besides (consumed solely by app/perf-harness.tsx, which renders
   // perf-unavailable outside __DEV__). Behavioural net: 12 jest tests

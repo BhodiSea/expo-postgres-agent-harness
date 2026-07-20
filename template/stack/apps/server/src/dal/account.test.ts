@@ -43,7 +43,10 @@ describe('accountDal.deleteAllOwnedData', () => {
     const sql = state.statements[0] ?? ''
     expect(sql).toMatch(/^delete from "notes"/i)
     expect(sql).not.toMatch(/where/i)
-    expect(sql).toMatch(/returning/i)
+    // The RETURNING projection is exactly the id — the deleted-count contract
+    // rides it, and a `returning *` would ship whole rows nobody consumes
+    // (mutation-killed: .returning({}) emits a different clause).
+    expect(sql).toMatch(/returning "id"/i)
     expect(result).toEqual({ deletedNotes: 2 })
   })
 
